@@ -37,7 +37,7 @@
         "https://teams.live.com/*"
       ],
       "css": ["src/content/overlay.css"],
-      "js": ["src/shared/config.js", "src/content/overlay.js"],
+      "js": ["src/shared/config.js", "src/shared/hud.js", "src/content/overlay.js"],
       "run_at": "document_idle"
     }
   ],

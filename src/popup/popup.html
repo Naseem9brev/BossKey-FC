@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>BossKey FC</title>
+    <link rel="stylesheet" href="../content/overlay.css" />
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
@@ -25,14 +26,8 @@
     </nav>
 
     <main class="tab-panel" data-panel="dashboard">
-      <section class="card">
-        <div class="card-hd">
-          <h2>Live now</h2>
-          <span id="liveCount" class="live-count" hidden></span>
-        </div>
-        <div id="scores" class="scores">Loading&#8230;</div>
-        <button id="refresh" class="ghost">Refresh scores</button>
-        <p id="source" class="hint"></p>
+      <section class="hud-host">
+        <div id="bk-overlay"><div class="bk-card"></div></div>
       </section>
 
       <section class="card">
@@ -44,13 +39,17 @@
           <button data-mode="linear" class="seg-btn"><span class="seg-ic">&#9673;</span>Linear</button>
           <button data-mode="sheets" class="seg-btn"><span class="seg-ic">&#8862;</span>Sheets</button>
         </div>
-        <p class="hint">Overlay morphs into the chosen app so it blends into work.</p>
+        <p class="hint">The HUD above morphs into the chosen app so it blends into work.</p>
       </section>
 
       <section class="card">
-        <h2>Boss-safe excuse</h2>
-        <button id="excuse" class="primary">Generate excuse</button>
-        <div id="excuseOut" class="excuse" hidden></div>
+        <div class="card-hd">
+          <h2>Live now</h2>
+          <span id="liveCount" class="live-count" hidden></span>
+        </div>
+        <div id="scores" class="scores">Loading&#8230;</div>
+        <button id="refresh" class="ghost">Refresh scores</button>
+        <p id="source" class="hint"></p>
       </section>
     </main>
 
@@ -94,6 +93,7 @@
     </footer>
 
     <script src="../shared/config.js"></script>
+    <script src="../shared/hud.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>
