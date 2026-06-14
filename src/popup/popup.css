@@ -100,6 +100,34 @@ h2 {
   margin-bottom: 10px;
 }
 
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.tab {
+  border: 1px solid var(--border);
+  background: #0c120c;
+  color: var(--muted);
+  padding: 8px;
+  border-radius: 9px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tab.on {
+  border-color: var(--green);
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+[hidden] {
+  display: none !important;
+}
+
 .scores {
   display: flex;
   flex-direction: column;
@@ -192,6 +220,23 @@ h2 {
 .field input:focus {
   outline: none;
   border-color: var(--green);
+}
+
+.field.stack {
+  display: block;
+}
+
+.field.stack span {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.field.stack input {
+  width: 100%;
+}
+
+.actions {
+  margin-top: 8px;
 }
 
 button.primary,

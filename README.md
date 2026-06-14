@@ -68,14 +68,14 @@ At a glance:
 
 ## Settings
 
-Open the popup (toolbar icon) to control:
+Open the popup (toolbar icon), then use the **Settings** tab to control:
 
 - **Enable overlay** — master on/off switch.
 - **Disguise** — Off, Sheets, Slack, or Jira.
 - **Favorite team** — used to highlight matches you care about.
 - **Poll every (min)** — how often scores refresh.
 - **Scores endpoint** — leave blank for the default open dataset, or point it at your own.
-- **Groq API key** — required only for the excuse generator ([get a free key](https://console.groq.com)).
+- **Groq API key** — saved in Chrome sync storage and required only for the excuse generator ([get a free key](https://console.groq.com)).
 
 ---
 
@@ -83,6 +83,7 @@ Open the popup (toolbar icon) to control:
 
 | Shortcut | Action |
 | --- | --- |
+| `Cmd + B` on Mac / `Ctrl + B` elsewhere | Open or close the popup |
 | `Alt + W` | Toggle the overlay |
 | `Esc` | Panic — hide immediately |
 
