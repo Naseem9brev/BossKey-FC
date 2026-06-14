@@ -9,9 +9,9 @@
   <body>
     <header class="hd">
       <span class="logo">&#9917;</span>
-      <div>
+      <div class="hd-text">
         <h1>BossKey FC</h1>
-        <p class="tag">Stealth scores at work</p>
+        <p class="tag">World Cup 2026 &middot; stealth scores</p>
       </div>
       <label class="switch" title="Enable overlay">
         <input type="checkbox" id="enabled" />
@@ -19,52 +19,77 @@
       </label>
     </header>
 
-    <section class="card">
-      <h2>Live now</h2>
-      <div id="scores" class="scores">Loading&#8230;</div>
-      <button id="refresh" class="ghost">Refresh scores</button>
-      <p id="source" class="hint"></p>
-    </section>
+    <nav class="tabs" aria-label="Popup sections">
+      <button class="tab on" data-tab="dashboard" type="button">Dashboard</button>
+      <button class="tab" data-tab="settings" type="button">Settings</button>
+    </nav>
 
-    <section class="card">
-      <h2>Disguise</h2>
-      <div class="seg" id="disguise">
-        <button data-mode="off" class="seg-btn">Off</button>
-        <button data-mode="sheets" class="seg-btn">Sheets</button>
-        <button data-mode="slack" class="seg-btn">Slack</button>
-        <button data-mode="jira" class="seg-btn">Jira</button>
-      </div>
-    </section>
+    <main class="tab-panel" data-panel="dashboard">
+      <section class="card">
+        <div class="card-hd">
+          <h2>Live now</h2>
+          <span id="liveCount" class="live-count" hidden></span>
+        </div>
+        <div id="scores" class="scores">Loading&#8230;</div>
+        <button id="refresh" class="ghost">Refresh scores</button>
+        <p id="source" class="hint"></p>
+      </section>
 
-    <section class="card">
-      <h2>Settings</h2>
-      <label class="field">
-        <span>Favorite team</span>
-        <input type="text" id="favoriteTeam" placeholder="e.g. England" />
-      </label>
-      <label class="field">
-        <span>Poll every (min)</span>
-        <input type="number" id="pollMinutes" min="0.5" step="0.5" />
-      </label>
-      <label class="field">
-        <span>Scores endpoint</span>
-        <input type="text" id="scoresEndpoint" placeholder="Leave blank for default" />
-      </label>
-      <label class="field">
-        <span>Groq API key</span>
-        <input type="password" id="groqApiKey" placeholder="gsk_&#8230; (for excuses)" />
-      </label>
-    </section>
+      <section class="card">
+        <h2>Disguise</h2>
+        <div class="seg" id="disguise">
+          <button data-mode="off" class="seg-btn"><span class="seg-ic">&#9917;</span>Native</button>
+          <button data-mode="slack" class="seg-btn"><span class="seg-ic">&#35;</span>Slack</button>
+          <button data-mode="jira" class="seg-btn"><span class="seg-ic">&#9635;</span>Jira</button>
+          <button data-mode="linear" class="seg-btn"><span class="seg-ic">&#9673;</span>Linear</button>
+          <button data-mode="sheets" class="seg-btn"><span class="seg-ic">&#8862;</span>Sheets</button>
+        </div>
+        <p class="hint">Overlay morphs into the chosen app so it blends into work.</p>
+      </section>
 
-    <section class="card">
-      <h2>Boss-safe excuse</h2>
-      <button id="excuse" class="primary">Generate excuse</button>
-      <div id="excuseOut" class="excuse" hidden></div>
-    </section>
+      <section class="card">
+        <h2>Boss-safe excuse</h2>
+        <button id="excuse" class="primary">Generate excuse</button>
+        <div id="excuseOut" class="excuse" hidden></div>
+      </section>
+    </main>
+
+    <main class="tab-panel" data-panel="settings" hidden>
+      <section class="card">
+        <h2>Extension settings</h2>
+        <label class="field">
+          <span>Favorite team</span>
+          <input type="text" id="favoriteTeam" placeholder="e.g. England" />
+        </label>
+        <label class="field">
+          <span>Poll every (min)</span>
+          <input type="number" id="pollMinutes" min="0.5" step="0.5" />
+        </label>
+        <label class="field">
+          <span>Scores endpoint</span>
+          <input type="text" id="scoresEndpoint" placeholder="Leave blank for default" />
+        </label>
+      </section>
+
+      <section class="card">
+        <h2>API keys</h2>
+        <label class="field stack">
+          <span>Groq API key</span>
+          <input type="password" id="groqApiKey" placeholder="gsk_&#8230; (for excuses)" autocomplete="off" />
+        </label>
+        <div class="actions">
+          <button id="clearGroqApiKey" class="ghost" type="button">Clear key</button>
+        </div>
+        <p class="hint">
+          Saved in Chrome sync storage. Used only when generating boss-safe excuses.
+        </p>
+      </section>
+    </main>
 
     <footer class="ft">
-      <span>Alt+W toggle</span>
-      <span>Esc panic</span>
+      <span><b>Cmd/Ctrl</b>+<b>B</b> popup</span>
+      <span><b>Alt</b>+<b>W</b> toggle</span>
+      <span><b>Esc</b> panic</span>
       <span id="status"></span>
     </footer>
 

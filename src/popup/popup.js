@@ -1,15 +1,20 @@
 /* BossKey FC — popup settings + live preview. */
 (function () {
-  const { STORAGE, MSG, DEFAULT_SETTINGS } = window.BOSSKEY_CONFIG;
+  const { STORAGE, MSG, DEFAULT_SETTINGS, flagEmoji } = window.BOSSKEY_CONFIG;
+  const flag = (c) => (flagEmoji ? flagEmoji(c) : "\u26BD");
 
   const els = {
+    tabs: [...document.querySelectorAll(".tab")],
+    panels: [...document.querySelectorAll(".tab-panel")],
     enabled: document.getElementById("enabled"),
     disguise: document.getElementById("disguise"),
     favoriteTeam: document.getElementById("favoriteTeam"),
     pollMinutes: document.getElementById("pollMinutes"),
     scoresEndpoint: document.getElementById("scoresEndpoint"),
     groqApiKey: document.getElementById("groqApiKey"),
+    clearGroqApiKey: document.getElementById("clearGroqApiKey"),
     scores: document.getElementById("scores"),
+    liveCount: document.getElementById("liveCount"),
     source: document.getElementById("source"),
     refresh: document.getElementById("refresh"),
     excuse: document.getElementById("excuse"),
@@ -19,6 +24,7 @@
 
   let settings = { ...DEFAULT_SETTINGS };
   let matches = [];
+  let popupPort = null;
 
   function send(type, extra = {}) {
     return new Promise((resolve) => {
@@ -26,6 +32,17 @@
         if (chrome.runtime.lastError) return resolve(null);
         resolve(res);
       });
+    });
+  }
+
+  function setActiveTab(tab) {
+    els.tabs.forEach((btn) => {
+      const on = btn.dataset.tab === tab;
+      btn.classList.toggle("on", on);
+      btn.setAttribute("aria-selected", String(on));
+    });
+    els.panels.forEach((panel) => {
+      panel.hidden = panel.dataset.panel !== tab;
     });
   }
 
@@ -61,21 +78,35 @@
     }
   }
 
+  function statusBits(m) {
+    const s = (m.status || "").toUpperCase();
+    if (s === "LIVE") return { cls: "live", txt: m.minute != null ? `${m.minute}'` : "LIVE" };
+    if (s === "HT") return { cls: "ht", txt: "HT" };
+    if (s === "FT") return { cls: "ft", txt: "FT" };
+    return { cls: "sched", txt: "\u2014" };
+  }
+
   function renderScores(meta) {
     if (!matches.length) {
       els.scores.textContent = "No matches available.";
+      els.liveCount.hidden = true;
       return;
     }
     els.scores.innerHTML = matches
-      .map(
-        (m) => `
+      .map((m) => {
+        const st = statusBits(m);
+        return `
         <div class="row">
-          <span class="nm">${esc(m.home.code || m.home.name)} v ${esc(m.away.code || m.away.name)}</span>
-          <span class="sc">${m.home.score}-${m.away.score}</span>
-          <span class="st">${esc(m.status)}${m.minute != null ? " " + m.minute + "'" : ""}</span>
-        </div>`
-      )
+          <span class="tm"><span class="fl">${flag(m.home.code)}</span>${esc(m.home.code || m.home.name)}</span>
+          <span class="sc">${esc(m.home.score)}<i>:</i>${esc(m.away.score)}</span>
+          <span class="tm ta">${esc(m.away.code || m.away.name)}<span class="fl">${flag(m.away.code)}</span></span>
+          <span class="st st-${st.cls}">${st.cls === "live" ? '<i class="dot"></i>' : ""}${esc(st.txt)}</span>
+        </div>`;
+      })
       .join("");
+    const liveN = matches.filter((m) => (m.status || "").toUpperCase() === "LIVE").length;
+    els.liveCount.hidden = liveN === 0;
+    els.liveCount.textContent = `${liveN} live`;
     if (meta) {
       const when = new Date(meta.at).toLocaleTimeString();
       els.source.textContent = `${meta.live ? "Live" : "Sample"} data \u00b7 updated ${when}`;
@@ -88,7 +119,34 @@
     renderScores(res && res.meta);
   }
 
+  function closePopup() {
+    window.close();
+  }
+
+  function wirePopupShortcut() {
+    try {
+      popupPort = chrome.runtime.connect({ name: "bosskey-popup" });
+      popupPort.onMessage.addListener((message) => {
+        if (message?.type === MSG.CLOSE_POPUP) closePopup();
+      });
+    } catch {
+      popupPort = null;
+    }
+
+    document.addEventListener("keydown", (e) => {
+      const key = e.key.toLowerCase();
+      const shortcut = key === "b" && (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey;
+      if (!shortcut) return;
+      e.preventDefault();
+      closePopup();
+    });
+  }
+
   /* events */
+  els.tabs.forEach((btn) => {
+    btn.addEventListener("click", () => setActiveTab(btn.dataset.tab));
+  });
+
   els.enabled.addEventListener("change", () => {
     settings.enabled = els.enabled.checked;
     save();
@@ -110,6 +168,12 @@
       });
     });
 
+  els.clearGroqApiKey.addEventListener("click", () => {
+    settings.groqApiKey = "";
+    els.groqApiKey.value = "";
+    save();
+  });
+
   els.pollMinutes.addEventListener("change", () => {
     settings.pollMinutes = Math.max(0.5, parseFloat(els.pollMinutes.value) || 1);
     save();
@@ -129,8 +193,11 @@
       : "a tense moment";
     const res = await send(MSG.GENERATE_EXCUSE, { context });
     els.excuseOut.textContent = res && res.ok ? res.excuse : (res?.error || "Could not generate.");
+    if (!res?.ok && !settings.groqApiKey) setActiveTab("settings");
   });
 
   /* init */
+  setActiveTab("dashboard");
+  wirePopupShortcut();
   load().then(() => loadScores(false));
 })();
