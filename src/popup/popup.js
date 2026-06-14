@@ -1,6 +1,7 @@
 /* BossKey FC — popup settings + live preview. */
 (function () {
-  const { STORAGE, MSG, DEFAULT_SETTINGS } = window.BOSSKEY_CONFIG;
+  const { STORAGE, MSG, DEFAULT_SETTINGS, flagEmoji } = window.BOSSKEY_CONFIG;
+  const flag = (c) => (flagEmoji ? flagEmoji(c) : "\u26BD");
 
   const els = {
     tabs: [...document.querySelectorAll(".tab")],
@@ -13,6 +14,7 @@
     groqApiKey: document.getElementById("groqApiKey"),
     clearGroqApiKey: document.getElementById("clearGroqApiKey"),
     scores: document.getElementById("scores"),
+    liveCount: document.getElementById("liveCount"),
     source: document.getElementById("source"),
     refresh: document.getElementById("refresh"),
     excuse: document.getElementById("excuse"),
@@ -76,21 +78,35 @@
     }
   }
 
+  function statusBits(m) {
+    const s = (m.status || "").toUpperCase();
+    if (s === "LIVE") return { cls: "live", txt: m.minute != null ? `${m.minute}'` : "LIVE" };
+    if (s === "HT") return { cls: "ht", txt: "HT" };
+    if (s === "FT") return { cls: "ft", txt: "FT" };
+    return { cls: "sched", txt: "\u2014" };
+  }
+
   function renderScores(meta) {
     if (!matches.length) {
       els.scores.textContent = "No matches available.";
+      els.liveCount.hidden = true;
       return;
     }
     els.scores.innerHTML = matches
-      .map(
-        (m) => `
+      .map((m) => {
+        const st = statusBits(m);
+        return `
         <div class="row">
-          <span class="nm">${esc(m.home.code || m.home.name)} v ${esc(m.away.code || m.away.name)}</span>
-          <span class="sc">${m.home.score}-${m.away.score}</span>
-          <span class="st">${esc(m.status)}${m.minute != null ? " " + m.minute + "'" : ""}</span>
-        </div>`
-      )
+          <span class="tm"><span class="fl">${flag(m.home.code)}</span>${esc(m.home.code || m.home.name)}</span>
+          <span class="sc">${esc(m.home.score)}<i>:</i>${esc(m.away.score)}</span>
+          <span class="tm ta">${esc(m.away.code || m.away.name)}<span class="fl">${flag(m.away.code)}</span></span>
+          <span class="st st-${st.cls}">${st.cls === "live" ? '<i class="dot"></i>' : ""}${esc(st.txt)}</span>
+        </div>`;
+      })
       .join("");
+    const liveN = matches.filter((m) => (m.status || "").toUpperCase() === "LIVE").length;
+    els.liveCount.hidden = liveN === 0;
+    els.liveCount.textContent = `${liveN} live`;
     if (meta) {
       const when = new Date(meta.at).toLocaleTimeString();
       els.source.textContent = `${meta.live ? "Live" : "Sample"} data \u00b7 updated ${when}`;

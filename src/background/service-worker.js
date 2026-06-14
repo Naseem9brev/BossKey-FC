@@ -10,8 +10,8 @@
 importScripts("/src/shared/config.js");
 
 const { STORAGE, ALARM_NAME, DEFAULT_POLL_MINUTES, DEFAULT_SCORES_ENDPOINT,
-  DEFAULT_TEAMS_ENDPOINT, MAX_MATCHES, GROQ_ENDPOINT, GROQ_MODEL,
-  DEFAULT_SETTINGS, MSG } = self.BOSSKEY_CONFIG;
+  DEFAULT_TEAMS_ENDPOINT, DEFAULT_STANDINGS_ENDPOINT, MAX_MATCHES,
+  GROQ_ENDPOINT, GROQ_MODEL, DEFAULT_SETTINGS, MSG } = self.BOSSKEY_CONFIG;
 
 /* ------------------------------------------------------------------ */
 /* Settings helpers                                                     */
@@ -51,6 +51,25 @@ function deriveMinute(raw) {
   return Number.isFinite(n) ? n : null;
 }
 
+// The feed stores scorers as a string ("null" when none). Parse defensively:
+// accept a JSON array, or a comma/semicolon-delimited list of names.
+function parseScorers(raw) {
+  if (raw == null) return [];
+  const s = String(raw).trim();
+  if (!s || s.toLowerCase() === "null") return [];
+  try {
+    const j = JSON.parse(s);
+    if (Array.isArray(j)) {
+      return j.map((x) => {
+        if (typeof x === "string") return x;
+        if (x && x.name) return x.minute ? `${x.name} ${x.minute}'` : x.name;
+        return String(x);
+      }).filter(Boolean);
+    }
+  } catch (e) { /* not JSON, fall through */ }
+  return s.split(/[;,]/).map((x) => x.trim()).filter(Boolean);
+}
+
 // The worldcup2026 feed references team IDs; everything else is a generic shape.
 function normalizeMatch(raw, index, teamMap) {
   if (raw.home_team_id != null || raw.away_team_id != null) {
@@ -63,7 +82,9 @@ function normalizeMatch(raw, index, teamMap) {
       kickoff: raw.local_date || "",
       home: { name: h.name || `Team ${raw.home_team_id}`, code: h.code || "", score: toInt(raw.home_score) },
       away: { name: a.name || `Team ${raw.away_team_id}`, code: a.code || "", score: toInt(raw.away_score) },
-      group: raw.group ? `Group ${raw.group}` : (raw.type || "")
+      group: raw.group ? `Group ${raw.group}` : (raw.type || ""),
+      groupKey: raw.group || "",
+      scorers: { home: parseScorers(raw.home_scorers), away: parseScorers(raw.away_scorers) }
     };
   }
 
@@ -85,7 +106,9 @@ function normalizeMatch(raw, index, teamMap) {
       code: away.code || away.shortName || "",
       score: away.score ?? raw.awayScore ?? 0
     },
-    group: raw.group || raw.stage || ""
+    group: raw.group || raw.stage || "",
+    groupKey: "",
+    scorers: { home: [], away: [] }
   };
 }
 
@@ -159,6 +182,38 @@ async function getCachedMatches() {
     matches: stored[STORAGE.MATCHES] || [],
     meta: stored[STORAGE.LAST_FETCH] || null
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* Group standings (same open dataset)                                  */
+/* ------------------------------------------------------------------ */
+let standingsCache = null; // { at, groups }
+
+async function fetchStandings() {
+  if (standingsCache && Date.now() - standingsCache.at < 60 * 1000) {
+    return standingsCache.groups;
+  }
+  const teamMap = await fetchTeamMap();
+  const res = await fetch(DEFAULT_STANDINGS_ENDPOINT, { cache: "no-store" });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  const groups = (Array.isArray(data) ? data : []).map((g) => ({
+    group: g.group ? `Group ${g.group}` : "",
+    key: g.group || "",
+    teams: (g.teams || [])
+      .map((t) => {
+        const info = teamMap[String(t.team_id)] || {};
+        return {
+          code: info.code || "",
+          name: info.name || `Team ${t.team_id}`,
+          mp: toInt(t.mp), w: toInt(t.w), d: toInt(t.d), l: toInt(t.l),
+          gf: toInt(t.gf), ga: toInt(t.ga), gd: toInt(t.gd), pts: toInt(t.pts)
+        };
+      })
+      .sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf)
+  }));
+  standingsCache = { at: Date.now(), groups };
+  return groups;
 }
 
 /* ------------------------------------------------------------------ */
@@ -313,6 +368,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       case MSG.GENERATE_EXCUSE: {
         const result = await generateExcuse(message.context);
         sendResponse(result);
+        break;
+      }
+      case MSG.GET_STANDINGS: {
+        try {
+          const groups = await fetchStandings();
+          sendResponse({ ok: true, groups });
+        } catch (err) {
+          sendResponse({ ok: false, error: err.message });
+        }
         break;
       }
       case MSG.SETTINGS_CHANGED: {
