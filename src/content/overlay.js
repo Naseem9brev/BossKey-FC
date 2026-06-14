@@ -65,9 +65,15 @@
 
   function fmtKick(localDate) {
     const m = /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/.exec(localDate || "");
-    if (!m) return "";
-    const [, mm, dd, , hh, mi] = m;
-    return `${+dd} ${MONTHS[+mm - 1]} · ${hh}:${mi}`;
+    if (m) {
+      const [, mm, dd, , hh, mi] = m;
+      return `${+dd} ${MONTHS[+mm - 1]} · ${hh}:${mi}`;
+    }
+    const d = new Date(localDate || "");
+    if (Number.isNaN(d.getTime())) return "";
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mi = String(d.getMinutes()).padStart(2, "0");
+    return `${d.getDate()} ${MONTHS[d.getMonth()]} · ${hh}:${mi}`;
   }
 
   function flag(code) {
@@ -181,12 +187,30 @@
       `<div class="bk-ev-list">${li(h, mt.home.code || mt.home.name)}${li(a, mt.away.code || mt.away.name)}</div>`;
   }
 
+  function cardsBlock(mt) {
+    const h = (mt.cards && mt.cards.home) || [];
+    const a = (mt.cards && mt.cards.away) || [];
+    if (!h.length && !a.length) return "";
+    const ic = (kind) => kind === "red" ? "bk-card-red" : "bk-card-yel";
+    const li = (arr, code) => arr.map((c) =>
+      `<div class="bk-scorer"><span class="bk-ev-ic ${ic(c.kind)}"></span>` +
+      `<span class="bk-ev-who">${esc(c.who)}${c.minute ? " " + esc(c.minute) : ""}</span>` +
+      `<span class="bk-ev-tm">${esc(code)}</span></div>`).join("");
+    return `<div class="bk-ev-head">Cards</div>` +
+      `<div class="bk-ev-list">${li(h, mt.home.code || mt.home.name)}${li(a, mt.away.code || mt.away.name)}</div>`;
+  }
+
   function findGroup(mt) {
     if (!standingsData) return null;
     const key = (mt.groupKey || "").toUpperCase();
     const gname = (mt.group || "").toUpperCase();
-    return standingsData.find((g) => key && (g.key || "").toUpperCase() === key) ||
-      standingsData.find((g) => gname && (g.group || "").toUpperCase() === gname) || null;
+    const byKey = standingsData.find((g) => key && (g.key || "").toUpperCase() === key) ||
+      standingsData.find((g) => gname && (g.group || "").toUpperCase() === gname);
+    if (byKey) return byKey;
+    // Fallback: find the group containing either of the fixture's teams.
+    return standingsData.find((g) => (g.teams || []).some((t) =>
+      teamLike(t.code, mt.home.code) || teamLike(t.code, mt.away.code) ||
+      teamLike(t.name, mt.home.name) || teamLike(t.name, mt.away.name))) || null;
   }
 
   function standingsBlock(mt) {
@@ -210,11 +234,12 @@
 
   function statsBody(mt) {
     const scorers = scorersBlock(mt);
+    const cards = cardsBlock(mt);
     let table;
     if (statsLoading && !standingsData) table = statsMsg("Loading standings\u2026");
     else if (statsError && !standingsData) table = statsMsg(statsError);
     else table = standingsBlock(mt);
-    return `<div class="bk-stats">${scorers}${table}</div>`;
+    return `<div class="bk-stats">${scorers}${cards}${table}</div>`;
   }
 
   function shellOff(body) {
