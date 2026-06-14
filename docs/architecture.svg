@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="640" viewBox="0 0 1000 640" font-family="Inter, Segoe UI, sans-serif">
+  <defs>
+    <style>
+      .bg { fill: #0a0e0a; }
+      .box { fill: #11161a; stroke: #22c55e; stroke-opacity: .45; rx: 14; }
+      .ext { fill: #141018; stroke: #a855f7; stroke-opacity: .5; }
+      .store { fill: #101814; stroke: #3b82f6; stroke-opacity: .5; }
+      .title { fill: #e8f0e8; font-size: 26px; font-weight: 700; }
+      .sub { fill: #94a89a; font-size: 13px; }
+      .h { fill: #e8f0e8; font-size: 16px; font-weight: 600; }
+      .t { fill: #cfe9d6; font-size: 12px; }
+      .lbl { fill: #94a89a; font-size: 11px; }
+      .green { fill: #22c55e; }
+      .edge { stroke: #2f4636; stroke-width: 2; fill: none; }
+      .edge-g { stroke: #22c55e; stroke-width: 2; fill: none; stroke-opacity: .8; }
+    </style>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#5b7a64" />
+    </marker>
+    <marker id="arrow-g" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#22c55e" />
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1000" height="640" />
+  <text class="title" x="40" y="52">BossKey FC &#8212; Architecture</text>
+  <text class="sub" x="40" y="76">Chrome MV3 extension &#183; zero backend &#183; data cached locally</text>
+
+  <!-- Content overlay -->
+  <rect class="box" x="40" y="120" width="250" height="150" rx="14" />
+  <text class="h" x="60" y="150">Content Overlay</text>
+  <text class="t" x="60" y="174">overlay.js &#183; overlay.css</text>
+  <text class="lbl" x="60" y="198">&#8226; Draggable score HUD</text>
+  <text class="lbl" x="60" y="218">&#8226; Panic key (Esc)</text>
+  <text class="lbl" x="60" y="238">&#8226; Disguise skins</text>
+  <text class="lbl" x="60" y="258">Injected into every tab</text>
+
+  <!-- Popup -->
+  <rect class="box" x="40" y="330" width="250" height="150" rx="14" />
+  <text class="h" x="60" y="360">Popup UI</text>
+  <text class="t" x="60" y="384">popup.html / .js / .css</text>
+  <text class="lbl" x="60" y="408">&#8226; Toolbar settings</text>
+  <text class="lbl" x="60" y="428">&#8226; Live preview</text>
+  <text class="lbl" x="60" y="448">&#8226; Disguise + Groq key</text>
+
+  <!-- Service worker (hub) -->
+  <rect class="box" x="390" y="225" width="230" height="190" rx="14" stroke-opacity=".9" />
+  <text class="h" x="410" y="256">Service Worker</text>
+  <text class="green" x="410" y="278" font-size="12">service-worker.js</text>
+  <text class="lbl" x="410" y="304">&#8226; Message router</text>
+  <text class="lbl" x="410" y="324">&#8226; Fetch + normalize</text>
+  <text class="lbl" x="410" y="344">&#8226; Excuse proxy</text>
+  <text class="lbl" x="410" y="364">&#8226; Alt+W command</text>
+  <text class="lbl" x="410" y="384">&#8226; Alarm handler</text>
+
+  <!-- Storage -->
+  <rect class="store" x="390" y="470" width="230" height="100" rx="14" />
+  <text class="h" x="410" y="500">chrome.storage</text>
+  <text class="lbl" x="410" y="524">sync &#8594; settings</text>
+  <text class="lbl" x="410" y="544">local &#8594; cached matches</text>
+
+  <!-- Alarms -->
+  <rect class="store" x="390" y="120" width="230" height="70" rx="14" />
+  <text class="h" x="410" y="150">chrome.alarms</text>
+  <text class="lbl" x="410" y="172">periodic score poll</text>
+
+  <!-- External APIs -->
+  <rect class="ext" x="720" y="170" width="240" height="110" rx="14" />
+  <text class="h" x="740" y="200">World Cup 2026 API</text>
+  <text class="lbl" x="740" y="224">open JSON dataset</text>
+  <text class="lbl" x="740" y="244">sample fallback if offline</text>
+
+  <rect class="ext" x="720" y="330" width="240" height="110" rx="14" />
+  <text class="h" x="740" y="360">Groq LLM API</text>
+  <text class="lbl" x="740" y="384">free tier &#183; llama 3.1</text>
+  <text class="lbl" x="740" y="404">boss-safe excuses</text>
+
+  <!-- Edges -->
+  <path class="edge-g" d="M290 195 H360 V300 H388" marker-end="url(#arrow-g)" />
+  <text class="lbl" x="300" y="188">messages</text>
+
+  <path class="edge-g" d="M290 405 H360 V330 H388" marker-end="url(#arrow-g)" />
+  <text class="lbl" x="300" y="425">settings + preview</text>
+
+  <path class="edge" d="M505 225 V192" marker-end="url(#arrow)" />
+  <text class="lbl" x="515" y="212">poll tick</text>
+
+  <path class="edge" d="M505 415 V468" marker-end="url(#arrow)" />
+  <text class="lbl" x="515" y="450">read / write</text>
+
+  <path class="edge" d="M620 270 H718" marker-end="url(#arrow)" />
+  <text class="lbl" x="636" y="262">fetch scores</text>
+
+  <path class="edge" d="M620 360 H718" marker-end="url(#arrow)" />
+  <text class="lbl" x="636" y="352">excuse request</text>
+</svg>

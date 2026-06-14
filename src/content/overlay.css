@@ -1,0 +1,233 @@
+/* BossKey FC overlay — glassmorphism HUD with disguise skins. */
+#bk-overlay {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 2147483647;
+  width: 248px;
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: #e8f0e8;
+  display: none;
+}
+
+#bk-overlay * {
+  box-sizing: border-box;
+}
+
+#bk-overlay .bk-card {
+  background: rgba(10, 14, 10, 0.72);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(34, 197, 94, 0.28);
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+#bk-overlay .bk-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  cursor: grab;
+  background: rgba(34, 197, 94, 0.1);
+  border-bottom: 1px solid rgba(34, 197, 94, 0.18);
+  user-select: none;
+}
+
+#bk-overlay .bk-head:active {
+  cursor: grabbing;
+}
+
+#bk-overlay .bk-glyph {
+  font-size: 14px;
+}
+
+#bk-overlay .bk-title {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#bk-overlay .bk-head-actions {
+  display: flex;
+  gap: 4px;
+}
+
+#bk-overlay .bk-icon-btn {
+  border: none;
+  background: transparent;
+  color: #cfe9d6;
+  font-size: 13px;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+#bk-overlay .bk-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+#bk-overlay .bk-panic:hover {
+  background: rgba(239, 68, 68, 0.85);
+  color: #fff;
+}
+
+#bk-overlay .bk-body {
+  padding: 12px 12px 8px;
+}
+
+#bk-overlay .bk-score {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
+}
+
+#bk-overlay .bk-team {
+  font-size: 13px;
+  font-weight: 600;
+  color: #d6e8da;
+  min-width: 34px;
+  text-align: center;
+}
+
+#bk-overlay .bk-num {
+  font-size: 26px;
+  font-weight: 700;
+  color: #22c55e;
+}
+
+#bk-overlay .bk-sep {
+  font-size: 20px;
+  color: #6b7d6f;
+}
+
+#bk-overlay .bk-meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 10px;
+  color: #94a89a;
+}
+
+#bk-overlay .bk-status {
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  background: rgba(148, 168, 154, 0.18);
+}
+
+#bk-overlay .bk-status-live {
+  background: rgba(34, 197, 94, 0.22);
+  color: #4ade80;
+}
+
+#bk-overlay .bk-status-ht {
+  background: rgba(234, 179, 8, 0.22);
+  color: #fbbf24;
+}
+
+#bk-overlay .bk-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+
+#bk-overlay .bk-nav-btn {
+  border: none;
+  background: rgba(255, 255, 255, 0.06);
+  color: #cfe9d6;
+  width: 24px;
+  height: 22px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+#bk-overlay .bk-nav-btn:hover {
+  background: rgba(34, 197, 94, 0.25);
+}
+
+#bk-overlay .bk-dots {
+  display: flex;
+  gap: 5px;
+}
+
+#bk-overlay .bk-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(148, 168, 154, 0.35);
+}
+
+#bk-overlay .bk-dot.on {
+  background: #22c55e;
+}
+
+#bk-overlay .bk-foot {
+  padding: 8px 12px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+#bk-overlay .bk-excuse-btn {
+  width: 100%;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+#bk-overlay .bk-excuse-btn:hover {
+  background: rgba(34, 197, 94, 0.22);
+}
+
+#bk-overlay .bk-excuse-out {
+  margin-top: 8px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #c9d6cc;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+/* ---- Disguise skins ---- */
+#bk-overlay.bk-skin-sheets .bk-card {
+  background: rgba(243, 246, 243, 0.95);
+  border-color: rgba(15, 157, 88, 0.5);
+  color: #1f2a20;
+}
+#bk-overlay.bk-skin-sheets .bk-head {
+  background: #0f9d58;
+  color: #fff;
+}
+#bk-overlay.bk-skin-sheets .bk-team,
+#bk-overlay.bk-skin-sheets .bk-meta {
+  color: #44524a;
+}
+
+#bk-overlay.bk-skin-slack .bk-head {
+  background: #4a154b;
+  color: #fff;
+}
+
+#bk-overlay.bk-skin-jira .bk-head {
+  background: #0052cc;
+  color: #fff;
+}
