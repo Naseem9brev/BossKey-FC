@@ -10,7 +10,8 @@
 importScripts("/src/shared/config.js");
 
 const { STORAGE, ALARM_NAME, DEFAULT_POLL_MINUTES, DEFAULT_SCORES_ENDPOINT,
-  GROQ_ENDPOINT, GROQ_MODEL, DEFAULT_SETTINGS, MSG } = self.BOSSKEY_CONFIG;
+  DEFAULT_TEAMS_ENDPOINT, MAX_MATCHES, GROQ_ENDPOINT, GROQ_MODEL,
+  DEFAULT_SETTINGS, MSG } = self.BOSSKEY_CONFIG;
 
 /* ------------------------------------------------------------------ */
 /* Settings helpers                                                     */
@@ -23,14 +24,57 @@ async function getSettings() {
 /* ------------------------------------------------------------------ */
 /* Score fetching                                                       */
 /* ------------------------------------------------------------------ */
-function normalizeMatch(raw, index) {
-  // Be tolerant of differing upstream shapes; fall back gracefully.
+function toInt(v) {
+  const n = parseInt(v, 10);
+  return Number.isFinite(n) ? n : 0;
+}
+
+// Parse the dataset's "MM/DD/YYYY HH:mm" kickoff into a sortable timestamp.
+function kickoffTs(localDate) {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/.exec(localDate || "");
+  if (!m) return Number.MAX_SAFE_INTEGER;
+  const [, mm, dd, yyyy, hh, mi] = m;
+  return Date.UTC(+yyyy, +mm - 1, +dd, +hh, +mi);
+}
+
+function deriveStatus(raw) {
+  if (raw.finished === "TRUE" || raw.finished === true) return "FT";
+  const te = String(raw.time_elapsed ?? "").toLowerCase();
+  if (te === "" || te === "notstarted") return "SCHEDULED";
+  if (te === "halftime" || te === "ht") return "HT";
+  if (te === "fulltime") return "FT";
+  return "LIVE";
+}
+
+function deriveMinute(raw) {
+  const n = parseInt(raw.time_elapsed, 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+// The worldcup2026 feed references team IDs; everything else is a generic shape.
+function normalizeMatch(raw, index, teamMap) {
+  if (raw.home_team_id != null || raw.away_team_id != null) {
+    const h = teamMap[String(raw.home_team_id)] || {};
+    const a = teamMap[String(raw.away_team_id)] || {};
+    return {
+      id: String(raw.id ?? `m-${index}`),
+      status: deriveStatus(raw),
+      minute: deriveMinute(raw),
+      kickoff: raw.local_date || "",
+      home: { name: h.name || `Team ${raw.home_team_id}`, code: h.code || "", score: toInt(raw.home_score) },
+      away: { name: a.name || `Team ${raw.away_team_id}`, code: a.code || "", score: toInt(raw.away_score) },
+      group: raw.group ? `Group ${raw.group}` : (raw.type || "")
+    };
+  }
+
+  // Generic / fallback shape for custom endpoints.
   const home = raw.home || raw.homeTeam || {};
   const away = raw.away || raw.awayTeam || {};
   return {
     id: String(raw.id ?? raw.matchId ?? `m-${index}`),
     status: raw.status || raw.state || "SCHEDULED",
     minute: raw.minute ?? raw.time ?? null,
+    kickoff: raw.kickoff || raw.local_date || "",
     home: {
       name: home.name || raw.homeName || "Home",
       code: home.code || home.shortName || "",
@@ -45,6 +89,38 @@ function normalizeMatch(raw, index) {
   };
 }
 
+async function fetchTeamMap() {
+  try {
+    const res = await fetch(DEFAULT_TEAMS_ENDPOINT, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const teams = await res.json();
+    const map = {};
+    for (const t of teams) {
+      map[String(t.id)] = {
+        name: t.name_en || t.name || `Team ${t.id}`,
+        code: t.fifa_code || t.code || ""
+      };
+    }
+    return map;
+  } catch (err) {
+    console.warn("[BossKey FC] teams fetch failed:", err.message);
+    return {};
+  }
+}
+
+const STATUS_RANK = { LIVE: 0, HT: 1, SCHEDULED: 2, FT: 3 };
+
+function prioritize(matches) {
+  return matches
+    .slice()
+    .sort((a, b) => {
+      const r = (STATUS_RANK[a.status] ?? 9) - (STATUS_RANK[b.status] ?? 9);
+      if (r !== 0) return r;
+      return kickoffTs(a.kickoff) - kickoffTs(b.kickoff);
+    })
+    .slice(0, MAX_MATCHES);
+}
+
 async function fetchMatches() {
   const settings = await getSettings();
   const endpoint = settings.scoresEndpoint || DEFAULT_SCORES_ENDPOINT;
@@ -54,7 +130,12 @@ async function fetchMatches() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const list = Array.isArray(data) ? data : data.matches || data.data || [];
-    const matches = list.map(normalizeMatch);
+
+    // Only the worldcup2026 shape needs the team-name join.
+    const needsTeams = list.some((m) => m && (m.home_team_id != null || m.away_team_id != null));
+    const teamMap = needsTeams ? await fetchTeamMap() : {};
+
+    const matches = prioritize(list.map((raw, i) => normalizeMatch(raw, i, teamMap)));
     await cacheMatches(matches, true);
     return matches;
   } catch (err) {

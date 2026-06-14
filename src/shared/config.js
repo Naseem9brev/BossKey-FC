@@ -16,11 +16,18 @@
     ALARM_NAME: "bosskey_poll_scores",
     DEFAULT_POLL_MINUTES: 1,
 
-    // Data source. The default is an open World Cup 2026 dataset; if it is
-    // unreachable the extension falls back to bundled sample matches so the
-    // overlay always renders something.
+    // Data source. The defaults point at the open World Cup 2026 dataset
+    // (rezarahiminia/worldcup2026). Matches reference team IDs, so the teams
+    // file is joined in to resolve names/codes. If the feed is unreachable the
+    // extension falls back to bundled sample matches so the overlay always
+    // renders something.
     DEFAULT_SCORES_ENDPOINT:
-      "https://raw.githubusercontent.com/rezarahiminia/worldcup2026/main/matches.json",
+      "https://raw.githubusercontent.com/rezarahiminia/worldcup2026/main/football.matches.json",
+    DEFAULT_TEAMS_ENDPOINT:
+      "https://raw.githubusercontent.com/rezarahiminia/worldcup2026/main/football.teams.json",
+
+    // Cap how many matches the overlay cycles through (live first, then soonest).
+    MAX_MATCHES: 16,
 
     // Groq (free tier) — used only for the Boss-Safe Excuse Generator.
     GROQ_ENDPOINT: "https://api.groq.com/openai/v1/chat/completions",
