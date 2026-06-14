@@ -22,6 +22,8 @@
   },
   "permissions": ["storage", "alarms"],
   "host_permissions": [
+    "https://site.api.espn.com/*",
+    "https://site.web.api.espn.com/*",
     "https://raw.githubusercontent.com/*",
     "https://api.groq.com/*"
   ],
