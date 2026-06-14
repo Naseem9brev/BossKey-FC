@@ -29,12 +29,16 @@ function toInt(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
-// Parse the dataset's "MM/DD/YYYY HH:mm" kickoff into a sortable timestamp.
+// Parse a kickoff into a sortable timestamp. Accepts the legacy
+// "MM/DD/YYYY HH:mm" dataset format and ISO strings (ESPN).
 function kickoffTs(localDate) {
   const m = /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/.exec(localDate || "");
-  if (!m) return Number.MAX_SAFE_INTEGER;
-  const [, mm, dd, yyyy, hh, mi] = m;
-  return Date.UTC(+yyyy, +mm - 1, +dd, +hh, +mi);
+  if (m) {
+    const [, mm, dd, yyyy, hh, mi] = m;
+    return Date.UTC(+yyyy, +mm - 1, +dd, +hh, +mi);
+  }
+  const t = Date.parse(localDate || "");
+  return Number.isFinite(t) ? t : Number.MAX_SAFE_INTEGER;
 }
 
 function deriveStatus(raw) {
@@ -112,6 +116,89 @@ function normalizeMatch(raw, index, teamMap) {
   };
 }
 
+/* ------------------------------------------------------------------ */
+/* ESPN public API (default source) — live scores, scorers, cards       */
+/* ------------------------------------------------------------------ */
+function espnStatus(stType) {
+  const state = (stType.state || "").toLowerCase();
+  const desc = (stType.description || "").toLowerCase();
+  if (state === "pre") return "SCHEDULED";
+  if (state === "post") return "FT";
+  if (desc.includes("halftime") || desc === "half time") return "HT";
+  return "LIVE";
+}
+
+function espnMinute(stType) {
+  const m = /(\d+)/.exec(stType.shortDetail || stType.detail || "");
+  return m ? parseInt(m[1], 10) : null;
+}
+
+// Goals and cards from a competition's `details` event list, split by team.
+function espnEvents(comp, homeId, awayId) {
+  const goals = { home: [], away: [] };
+  const cards = { home: [], away: [] };
+  for (const d of comp.details || []) {
+    const txt = ((d.type && d.type.text) || "").toLowerCase();
+    const tid = String((d.team && d.team.id) ?? "");
+    const side = tid === String(homeId) ? "home" : tid === String(awayId) ? "away" : null;
+    if (!side) continue;
+    const ath = (d.athletesInvolved || [])[0] || {};
+    const who = ath.displayName || ath.shortName || "";
+    const minute = (d.clock && d.clock.displayValue) || "";
+    if (d.scoringPlay || txt.includes("goal")) {
+      const own = txt.includes("own goal") ? " (OG)" : "";
+      const label = (who || "Goal") + own;
+      goals[side].push(minute ? `${label} ${minute}` : label);
+    } else if (txt.includes("red card")) {
+      cards[side].push({ who: who || "—", minute, kind: "red" });
+    } else if (txt.includes("yellow card")) {
+      cards[side].push({ who: who || "—", minute, kind: "yellow" });
+    }
+  }
+  return { goals, cards };
+}
+
+function normalizeEspnEvent(ev, index, groupMap) {
+  const comp = (ev.competitions || [])[0] || {};
+  const stType = ((comp.status || ev.status || {}).type) || {};
+  const competitors = comp.competitors || [];
+  const home = competitors.find((c) => c.homeAway === "home") || competitors[0] || {};
+  const away = competitors.find((c) => c.homeAway === "away") || competitors[1] || {};
+  const ht = home.team || {};
+  const at = away.team || {};
+  const code = (t) => String(t.abbreviation || t.shortDisplayName || "").toUpperCase();
+  const hc = code(ht);
+  const ac = code(at);
+  const { goals, cards } = espnEvents(comp, ht.id, at.id);
+  const group = (groupMap && (groupMap[hc] || groupMap[ac])) || "";
+  return {
+    id: String(ev.id ?? comp.id ?? `m-${index}`),
+    status: espnStatus(stType),
+    minute: espnMinute(stType),
+    kickoff: ev.date || comp.date || "",
+    home: { name: ht.displayName || ht.name || "Home", code: hc, score: toInt(home.score) },
+    away: { name: at.displayName || at.name || "Away", code: ac, score: toInt(away.score) },
+    group,
+    groupKey: group.replace(/^Group\s+/i, ""),
+    scorers: goals,
+    cards
+  };
+}
+
+// Map team code -> "Group X" from cached standings, to label fixtures.
+async function buildGroupMap() {
+  try {
+    const groups = await fetchStandings();
+    const map = {};
+    for (const g of groups) {
+      for (const t of g.teams) if (t.code) map[t.code.toUpperCase()] = g.group;
+    }
+    return map;
+  } catch (err) {
+    return {};
+  }
+}
+
 async function fetchTeamMap() {
   try {
     const res = await fetch(DEFAULT_TEAMS_ENDPOINT, { cache: "no-store" });
@@ -152,13 +239,19 @@ async function fetchMatches() {
     const res = await fetch(endpoint, { cache: "no-store" });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    const list = Array.isArray(data) ? data : data.matches || data.data || [];
 
-    // Only the worldcup2026 shape needs the team-name join.
-    const needsTeams = list.some((m) => m && (m.home_team_id != null || m.away_team_id != null));
-    const teamMap = needsTeams ? await fetchTeamMap() : {};
-
-    const matches = prioritize(list.map((raw, i) => normalizeMatch(raw, i, teamMap)));
+    let matches;
+    if (data && Array.isArray(data.events)) {
+      // ESPN scoreboard shape (the default source).
+      const groupMap = await buildGroupMap();
+      matches = prioritize(data.events.map((ev, i) => normalizeEspnEvent(ev, i, groupMap)));
+    } else {
+      const list = Array.isArray(data) ? data : data.matches || data.data || [];
+      // Only the worldcup2026 shape needs the team-name join.
+      const needsTeams = list.some((m) => m && (m.home_team_id != null || m.away_team_id != null));
+      const teamMap = needsTeams ? await fetchTeamMap() : {};
+      matches = prioritize(list.map((raw, i) => normalizeMatch(raw, i, teamMap)));
+    }
     await cacheMatches(matches, true);
     return matches;
   } catch (err) {
@@ -189,29 +282,59 @@ async function getCachedMatches() {
 /* ------------------------------------------------------------------ */
 let standingsCache = null; // { at, groups }
 
+// ESPN standings: { children: [ { name:"Group A", standings:{ entries:[
+//   { team, stats:[{type:"points",value}, ...] } ] } } ] }
+function normalizeEspnStandings(data) {
+  return (data.children || []).map((g) => {
+    const name = g.name || "";
+    const entries = (g.standings && g.standings.entries) || [];
+    const teams = entries.map((e) => {
+      const t = e.team || {};
+      const byType = {};
+      for (const s of e.stats || []) byType[s.type] = s.value;
+      const v = (k) => toInt(byType[k]);
+      return {
+        code: String(t.abbreviation || "").toUpperCase(),
+        name: t.displayName || t.name || "",
+        mp: v("gamesplayed"), w: v("wins"), d: v("ties"), l: v("losses"),
+        gf: v("pointsfor"), ga: v("pointsagainst"),
+        gd: v("pointdifferential"), pts: v("points")
+      };
+    }).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+    return { group: name, key: name.replace(/^Group\s+/i, ""), teams };
+  });
+}
+
 async function fetchStandings() {
   if (standingsCache && Date.now() - standingsCache.at < 60 * 1000) {
     return standingsCache.groups;
   }
-  const teamMap = await fetchTeamMap();
   const res = await fetch(DEFAULT_STANDINGS_ENDPOINT, { cache: "no-store" });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
-  const groups = (Array.isArray(data) ? data : []).map((g) => ({
-    group: g.group ? `Group ${g.group}` : "",
-    key: g.group || "",
-    teams: (g.teams || [])
-      .map((t) => {
-        const info = teamMap[String(t.team_id)] || {};
-        return {
-          code: info.code || "",
-          name: info.name || `Team ${t.team_id}`,
-          mp: toInt(t.mp), w: toInt(t.w), d: toInt(t.d), l: toInt(t.l),
-          gf: toInt(t.gf), ga: toInt(t.ga), gd: toInt(t.gd), pts: toInt(t.pts)
-        };
-      })
-      .sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf)
-  }));
+
+  let groups;
+  if (data && Array.isArray(data.children)) {
+    groups = normalizeEspnStandings(data);
+  } else {
+    // Legacy worldcup2026 matchtables shape (team-id based).
+    const teamMap = await fetchTeamMap();
+    groups = (Array.isArray(data) ? data : []).map((g) => ({
+      group: g.group ? `Group ${g.group}` : "",
+      key: g.group || "",
+      teams: (g.teams || [])
+        .map((t) => {
+          const info = teamMap[String(t.team_id)] || {};
+          return {
+            code: info.code || "",
+            name: info.name || `Team ${t.team_id}`,
+            mp: toInt(t.mp), w: toInt(t.w), d: toInt(t.d), l: toInt(t.l),
+            gf: toInt(t.gf), ga: toInt(t.ga), gd: toInt(t.gd), pts: toInt(t.pts)
+          };
+        })
+        .sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf)
+    }));
+  }
   standingsCache = { at: Date.now(), groups };
   return groups;
 }

@@ -16,18 +16,20 @@
     ALARM_NAME: "bosskey_poll_scores",
     DEFAULT_POLL_MINUTES: 1,
 
-    // Data source. The defaults point at the open World Cup 2026 dataset
-    // (rezarahiminia/worldcup2026). Matches reference team IDs, so the teams
-    // file is joined in to resolve names/codes. If the feed is unreachable the
-    // extension falls back to bundled sample matches so the overlay always
-    // renders something.
+    // Data source. The defaults point at ESPN's free public soccer API (no key,
+    // no signup) for the FIFA World Cup, which serves real live scores, match
+    // minute, goal scorers and cards. The scoreboard returns the current day's
+    // fixtures (live first); standings power the Stats tab. If the feed is
+    // unreachable the extension falls back to bundled sample matches so the
+    // overlay always renders something.
     DEFAULT_SCORES_ENDPOINT:
-      "https://raw.githubusercontent.com/rezarahiminia/worldcup2026/main/football.matches.json",
+      "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard",
+    // Legacy worldcup2026 teams file — only used if a custom team-id feed is set.
     DEFAULT_TEAMS_ENDPOINT:
       "https://raw.githubusercontent.com/rezarahiminia/worldcup2026/main/football.teams.json",
-    // Group standings table (same open dataset) — powers the Stats tab.
+    // Group standings (ESPN) — powers the Stats tab.
     DEFAULT_STANDINGS_ENDPOINT:
-      "https://raw.githubusercontent.com/rezarahiminia/worldcup2026/main/football.matchtables.json",
+      "https://site.api.espn.com/apis/v2/sports/soccer/fifa.world/standings",
 
     // Cap how many matches the overlay cycles through (live first, then soonest).
     MAX_MATCHES: 16,
