@@ -238,6 +238,96 @@
   color: #8fae9b;
 }
 
+/* ---- Native Score/Stats tabs -------------------------------- */
+#bk-overlay .bk-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  margin-bottom: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 9px;
+}
+#bk-overlay .bk-tab {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: #9fc2ac;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  padding: 6px 0;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+#bk-overlay .bk-tab:hover { color: #d6f5e1; }
+#bk-overlay .bk-tab.on {
+  background: rgba(34, 197, 94, 0.22);
+  color: #eafff1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* ---- Native Stats panel ------------------------------------- */
+#bk-overlay .bk-stats-msg {
+  text-align: center;
+  padding: 16px 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #8fae9b;
+}
+#bk-overlay .bk-ev-head {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #6ee7a0;
+  margin: 2px 0 6px;
+}
+#bk-overlay .bk-ev-list { margin-bottom: 10px; }
+#bk-overlay .bk-scorer {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  padding: 3px 0;
+  color: #e3efe7;
+}
+#bk-overlay .bk-ev-ic { font-size: 12px; }
+#bk-overlay .bk-ev-who { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#bk-overlay .bk-ev-tm { font-weight: 700; color: #9fc2ac; font-size: 10px; }
+
+#bk-overlay .bk-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+#bk-overlay .bk-table th {
+  font-size: 9px;
+  font-weight: 700;
+  color: #6f8f7c;
+  text-align: center;
+  padding: 3px 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+#bk-overlay .bk-table th:nth-child(2) { text-align: left; }
+#bk-overlay .bk-table td {
+  font-size: 10px;
+  color: #d3e4d8;
+  text-align: center;
+  padding: 4px 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+#bk-overlay .bk-tpos { color: #6f8f7c; }
+#bk-overlay .bk-tteam {
+  text-align: left !important;
+  font-weight: 700;
+  color: #eaf6ee;
+  white-space: nowrap;
+}
+#bk-overlay .bk-tpts { font-weight: 800; color: #fff; }
+#bk-overlay .bk-tr-on td { background: rgba(34, 197, 94, 0.16); }
+#bk-overlay .bk-tr-on .bk-tteam { color: #6ee7a0; }
+
 /* ============================================================= */
 /* SLACK SKIN                                                    */
 /* ============================================================= */

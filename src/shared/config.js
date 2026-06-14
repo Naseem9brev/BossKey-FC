@@ -25,6 +25,9 @@
       "https://raw.githubusercontent.com/rezarahiminia/worldcup2026/main/football.matches.json",
     DEFAULT_TEAMS_ENDPOINT:
       "https://raw.githubusercontent.com/rezarahiminia/worldcup2026/main/football.teams.json",
+    // Group standings table (same open dataset) — powers the Stats tab.
+    DEFAULT_STANDINGS_ENDPOINT:
+      "https://raw.githubusercontent.com/rezarahiminia/worldcup2026/main/football.matchtables.json",
 
     // Cap how many matches the overlay cycles through (live first, then soonest).
     MAX_MATCHES: 16,
@@ -51,6 +54,7 @@
       GET_MATCHES: "GET_MATCHES",
       REFRESH_MATCHES: "REFRESH_MATCHES",
       GENERATE_EXCUSE: "GENERATE_EXCUSE",
+      GET_STANDINGS: "GET_STANDINGS",
       SETTINGS_CHANGED: "SETTINGS_CHANGED",
       TOGGLE_OVERLAY: "TOGGLE_OVERLAY"
     }

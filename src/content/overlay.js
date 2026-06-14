@@ -19,6 +19,12 @@
   let visible = false;
   let pollTimer = null;
 
+  // Native-HUD secondary "Stats" tab (group standings + scorers).
+  let activeTab = "score";
+  let standingsData = null;
+  let statsLoading = false;
+  let statsError = null;
+
   /* ---------------------------------------------------------------- */
   /* Messaging helpers                                                */
   /* ---------------------------------------------------------------- */
@@ -112,10 +118,20 @@
 
   function skinOff(mt) {
     if (!mt) return shellOff(emptyBody("No matches · ↻"));
+    const tabs = `
+      <div class="bk-tabs">
+        <button class="bk-tab${activeTab === "score" ? " on" : ""}" data-bk-tab="score">Score</button>
+        <button class="bk-tab${activeTab === "stats" ? " on" : ""}" data-bk-tab="stats">Stats</button>
+      </div>`;
+    const content = activeTab === "stats" ? statsBody(mt) : scoreBody(mt);
+    return shellOff(tabs + content);
+  }
+
+  function scoreBody(mt) {
     const live = (mt.status || "").toUpperCase() === "LIVE";
     const st = statusText(mt);
     const stCls = (mt.status || "").toLowerCase();
-    const body = `
+    return `
       <div class="bk-stage">
         <div class="bk-side">
           <span class="bk-flag">${flag(mt.home.code)}</span>
@@ -139,7 +155,66 @@
         <span class="bk-dots">${dots()}</span>
         <button class="bk-nav-btn" data-bk-next>\u203A</button>
       </div>`;
-    return shellOff(body);
+  }
+
+  /* ---- Native "Stats" tab: scorers + group standings ------------- */
+  function statsMsg(text) {
+    return `<div class="bk-stats-msg">${esc(text)}</div>`;
+  }
+
+  function teamLike(a, b) {
+    if (!a || !b) return false;
+    const x = String(a).toLowerCase();
+    const y = String(b).toLowerCase();
+    return x === y || x.includes(y) || y.includes(x);
+  }
+
+  function scorersBlock(mt) {
+    const h = (mt.scorers && mt.scorers.home) || [];
+    const a = (mt.scorers && mt.scorers.away) || [];
+    if (!h.length && !a.length) return "";
+    const li = (arr, code) => arr.map((s) =>
+      `<div class="bk-scorer"><span class="bk-ev-ic">\u26BD</span>` +
+      `<span class="bk-ev-who">${esc(s)}</span>` +
+      `<span class="bk-ev-tm">${esc(code)}</span></div>`).join("");
+    return `<div class="bk-ev-head">Scorers</div>` +
+      `<div class="bk-ev-list">${li(h, mt.home.code || mt.home.name)}${li(a, mt.away.code || mt.away.name)}</div>`;
+  }
+
+  function findGroup(mt) {
+    if (!standingsData) return null;
+    const key = (mt.groupKey || "").toUpperCase();
+    const gname = (mt.group || "").toUpperCase();
+    return standingsData.find((g) => key && (g.key || "").toUpperCase() === key) ||
+      standingsData.find((g) => gname && (g.group || "").toUpperCase() === gname) || null;
+  }
+
+  function standingsBlock(mt) {
+    const g = findGroup(mt);
+    if (!g) return statsMsg("Standings show for group-stage fixtures.");
+    const rows = g.teams.map((t, i) => {
+      const here = teamLike(t.code, mt.home.code) || teamLike(t.code, mt.away.code) ||
+        teamLike(t.name, mt.home.name) || teamLike(t.name, mt.away.name);
+      const gd = `${t.gd > 0 ? "+" : ""}${t.gd}`;
+      return `<tr class="${here ? "bk-tr-on" : ""}">` +
+        `<td class="bk-tpos">${i + 1}</td>` +
+        `<td class="bk-tteam">${flag(t.code)} ${esc(t.code || t.name)}</td>` +
+        `<td>${t.mp}</td><td>${t.w}</td><td>${t.d}</td><td>${t.l}</td>` +
+        `<td>${esc(gd)}</td><td class="bk-tpts">${t.pts}</td></tr>`;
+    }).join("");
+    return `<div class="bk-ev-head">${esc(g.group || "Group")}</div>` +
+      `<table class="bk-table"><thead><tr>` +
+      `<th></th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>Pts</th>` +
+      `</tr></thead><tbody>${rows}</tbody></table>`;
+  }
+
+  function statsBody(mt) {
+    const scorers = scorersBlock(mt);
+    let table;
+    if (statsLoading && !standingsData) table = statsMsg("Loading standings\u2026");
+    else if (statsError && !standingsData) table = statsMsg(statsError);
+    else table = standingsBlock(mt);
+    return `<div class="bk-stats">${scorers}${table}</div>`;
   }
 
   function shellOff(body) {
@@ -424,8 +499,33 @@
         render();
       }));
 
+    card.querySelectorAll("[data-bk-tab]").forEach((el) =>
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const tab = el.dataset.bkTab;
+        if (tab === activeTab) return;
+        activeTab = tab;
+        render();
+        if (tab === "stats") loadStandings();
+      }));
+
     const excuse = card.querySelector("[data-bk-excuse]");
     if (excuse) excuse.addEventListener("click", (e) => { e.stopPropagation(); onExcuse(); });
+  }
+
+  async function loadStandings() {
+    if (standingsData) {
+      if (activeTab === "stats" && visible) render();
+      return;
+    }
+    statsLoading = true;
+    statsError = null;
+    if (activeTab === "stats" && visible) render();
+    const res = await send(MSG.GET_STANDINGS);
+    statsLoading = false;
+    if (!res || !res.ok) statsError = (res && res.error) || "Could not load standings.";
+    else { standingsData = res.groups || []; statsError = null; }
+    if (activeTab === "stats" && visible) render();
   }
 
   async function onExcuse() {
