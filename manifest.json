@@ -1,0 +1,51 @@
+{
+  "manifest_version": 3,
+  "name": "BossKey FC",
+  "version": "1.0.0",
+  "description": "Stealth World Cup 2026 live scores at work. Disguised overlay, panic button, and boss-safe excuses.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_title": "BossKey FC",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "src/background/service-worker.js"
+  },
+  "permissions": ["storage", "alarms"],
+  "host_permissions": [
+    "https://raw.githubusercontent.com/*",
+    "https://api.groq.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "exclude_matches": [
+        "https://meet.google.com/*",
+        "https://*.zoom.us/*",
+        "https://teams.microsoft.com/*",
+        "https://teams.live.com/*"
+      ],
+      "css": ["src/content/overlay.css"],
+      "js": ["src/shared/config.js", "src/content/overlay.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "commands": {
+    "toggle-overlay": {
+      "suggested_key": {
+        "default": "Alt+W",
+        "mac": "Alt+W"
+      },
+      "description": "Show or hide the BossKey FC overlay"
+    }
+  }
+}
