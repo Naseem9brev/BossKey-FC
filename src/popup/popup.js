@@ -3,12 +3,15 @@
   const { STORAGE, MSG, DEFAULT_SETTINGS } = window.BOSSKEY_CONFIG;
 
   const els = {
+    tabs: [...document.querySelectorAll(".tab")],
+    panels: [...document.querySelectorAll(".tab-panel")],
     enabled: document.getElementById("enabled"),
     disguise: document.getElementById("disguise"),
     favoriteTeam: document.getElementById("favoriteTeam"),
     pollMinutes: document.getElementById("pollMinutes"),
     scoresEndpoint: document.getElementById("scoresEndpoint"),
     groqApiKey: document.getElementById("groqApiKey"),
+    clearGroqApiKey: document.getElementById("clearGroqApiKey"),
     scores: document.getElementById("scores"),
     source: document.getElementById("source"),
     refresh: document.getElementById("refresh"),
@@ -26,6 +29,17 @@
         if (chrome.runtime.lastError) return resolve(null);
         resolve(res);
       });
+    });
+  }
+
+  function setActiveTab(tab) {
+    els.tabs.forEach((btn) => {
+      const on = btn.dataset.tab === tab;
+      btn.classList.toggle("on", on);
+      btn.setAttribute("aria-selected", String(on));
+    });
+    els.panels.forEach((panel) => {
+      panel.hidden = panel.dataset.panel !== tab;
     });
   }
 
@@ -89,6 +103,10 @@
   }
 
   /* events */
+  els.tabs.forEach((btn) => {
+    btn.addEventListener("click", () => setActiveTab(btn.dataset.tab));
+  });
+
   els.enabled.addEventListener("change", () => {
     settings.enabled = els.enabled.checked;
     save();
@@ -110,6 +128,12 @@
       });
     });
 
+  els.clearGroqApiKey.addEventListener("click", () => {
+    settings.groqApiKey = "";
+    els.groqApiKey.value = "";
+    save();
+  });
+
   els.pollMinutes.addEventListener("change", () => {
     settings.pollMinutes = Math.max(0.5, parseFloat(els.pollMinutes.value) || 1);
     save();
@@ -129,8 +153,10 @@
       : "a tense moment";
     const res = await send(MSG.GENERATE_EXCUSE, { context });
     els.excuseOut.textContent = res && res.ok ? res.excuse : (res?.error || "Could not generate.");
+    if (!res?.ok && !settings.groqApiKey) setActiveTab("settings");
   });
 
   /* init */
+  setActiveTab("dashboard");
   load().then(() => loadScores(false));
 })();
