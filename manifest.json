@@ -40,6 +40,13 @@
     }
   ],
   "commands": {
+    "toggle-popup": {
+      "suggested_key": {
+        "default": "Ctrl+B",
+        "mac": "Command+B"
+      },
+      "description": "Open or close the BossKey FC popup"
+    },
     "toggle-overlay": {
       "suggested_key": {
         "default": "Alt+W",

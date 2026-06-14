@@ -83,6 +83,7 @@ Open the popup (toolbar icon), then use the **Settings** tab to control:
 
 | Shortcut | Action |
 | --- | --- |
+| `Cmd + B` on Mac / `Ctrl + B` elsewhere | Open or close the popup |
 | `Alt + W` | Toggle the overlay |
 | `Esc` | Panic — hide immediately |
 

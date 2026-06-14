@@ -158,9 +158,49 @@ chrome.runtime.onStartup.addListener(async () => {
 });
 
 /* ------------------------------------------------------------------ */
-/* Keyboard command (Alt+W)                                             */
+/* Popup connection                                                     */
+/* ------------------------------------------------------------------ */
+let popupPort = null;
+
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== "bosskey-popup") return;
+  popupPort = port;
+  port.onDisconnect.addListener(() => {
+    if (popupPort === port) popupPort = null;
+  });
+});
+
+async function togglePopup() {
+  if (popupPort) {
+    try {
+      popupPort.postMessage({ type: MSG.CLOSE_POPUP });
+    } catch {
+      popupPort = null;
+    }
+    return;
+  }
+
+  if (!chrome.action?.openPopup) {
+    console.warn("[BossKey FC] chrome.action.openPopup is unavailable.");
+    return;
+  }
+
+  try {
+    await chrome.action.openPopup();
+  } catch (err) {
+    console.warn("[BossKey FC] popup shortcut failed:", err.message);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Keyboard commands                                                    */
 /* ------------------------------------------------------------------ */
 chrome.commands.onCommand.addListener(async (command) => {
+  if (command === "toggle-popup") {
+    await togglePopup();
+    return;
+  }
+
   if (command !== "toggle-overlay") return;
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (tab?.id) {

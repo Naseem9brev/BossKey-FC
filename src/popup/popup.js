@@ -22,6 +22,7 @@
 
   let settings = { ...DEFAULT_SETTINGS };
   let matches = [];
+  let popupPort = null;
 
   function send(type, extra = {}) {
     return new Promise((resolve) => {
@@ -102,6 +103,29 @@
     renderScores(res && res.meta);
   }
 
+  function closePopup() {
+    window.close();
+  }
+
+  function wirePopupShortcut() {
+    try {
+      popupPort = chrome.runtime.connect({ name: "bosskey-popup" });
+      popupPort.onMessage.addListener((message) => {
+        if (message?.type === MSG.CLOSE_POPUP) closePopup();
+      });
+    } catch {
+      popupPort = null;
+    }
+
+    document.addEventListener("keydown", (e) => {
+      const key = e.key.toLowerCase();
+      const shortcut = key === "b" && (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey;
+      if (!shortcut) return;
+      e.preventDefault();
+      closePopup();
+    });
+  }
+
   /* events */
   els.tabs.forEach((btn) => {
     btn.addEventListener("click", () => setActiveTab(btn.dataset.tab));
@@ -158,5 +182,6 @@
 
   /* init */
   setActiveTab("dashboard");
+  wirePopupShortcut();
   load().then(() => loadScores(false));
 })();
