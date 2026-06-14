@@ -1,6 +1,8 @@
-/* BossKey FC — popup settings + live preview. */
+/* BossKey FC — popup. Renders the live HUD (same renderer as the on-page
+ * overlay) so the popup itself morphs into each disguise, plus settings. */
 (function () {
   const { STORAGE, MSG, DEFAULT_SETTINGS, flagEmoji } = window.BOSSKEY_CONFIG;
+  const HUD = window.BOSSKEY_HUD;
   const flag = (c) => (flagEmoji ? flagEmoji(c) : "\u26BD");
 
   const els = {
@@ -17,14 +19,21 @@
     liveCount: document.getElementById("liveCount"),
     source: document.getElementById("source"),
     refresh: document.getElementById("refresh"),
-    excuse: document.getElementById("excuse"),
-    excuseOut: document.getElementById("excuseOut"),
+    hudRoot: document.getElementById("bk-overlay"),
+    hudCard: document.querySelector("#bk-overlay .bk-card"),
     status: document.getElementById("status")
   };
 
   let settings = { ...DEFAULT_SETTINGS };
   let matches = [];
   let popupPort = null;
+
+  // Live HUD state (mirrors the overlay's local state).
+  let hudIndex = 0;
+  let hudTab = "score";
+  let standings = null;
+  let statsLoading = false;
+  let statsError = null;
 
   function send(type, extra = {}) {
     return new Promise((resolve) => {
@@ -78,6 +87,116 @@
     }
   }
 
+  /* ---------------------------------------------------------------- */
+  /* Live HUD (same renderer as the on-page overlay)                  */
+  /* ---------------------------------------------------------------- */
+  function current() {
+    return matches[hudIndex] || null;
+  }
+
+  function renderHud() {
+    if (!HUD || !els.hudRoot || !els.hudCard) return;
+    if (hudIndex >= matches.length) hudIndex = 0;
+    const out = HUD.render({
+      settings,
+      matches,
+      activeIndex: hudIndex,
+      activeTab: hudTab,
+      standings,
+      statsLoading,
+      statsError
+    });
+    els.hudRoot.className = out.className;
+    els.hudCard.innerHTML = out.html;
+    wireHud();
+  }
+
+  function wireHud() {
+    const card = els.hudCard;
+
+    card.querySelectorAll("[data-bk-panic]").forEach((el) =>
+      el.addEventListener("click", (e) => { e.stopPropagation(); closePopup(); }));
+
+    const refresh = card.querySelector("[data-bk-refresh]");
+    if (refresh) refresh.addEventListener("click", (e) => {
+      e.stopPropagation();
+      loadScores(true);
+    });
+
+    card.querySelectorAll("[data-bk-next]").forEach((el) =>
+      el.addEventListener("click", () => {
+        if (!matches.length) return;
+        hudIndex = (hudIndex + 1) % matches.length;
+        renderHud();
+      }));
+
+    card.querySelectorAll("[data-bk-prev]").forEach((el) =>
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (!matches.length) return;
+        hudIndex = (hudIndex - 1 + matches.length) % matches.length;
+        renderHud();
+      }));
+
+    card.querySelectorAll("[data-bk-tab]").forEach((el) =>
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const tab = el.dataset.bkTab;
+        if (tab === hudTab) return;
+        hudTab = tab;
+        renderHud();
+        if (tab === "stats") loadStandings();
+      }));
+
+    const excuse = card.querySelector("[data-bk-excuse]");
+    if (excuse) excuse.addEventListener("click", (e) => { e.stopPropagation(); onExcuse(); });
+
+    card.querySelectorAll("[data-bk-skin]").forEach((el) =>
+      el.addEventListener("click", (e) => { e.stopPropagation(); setDisguise(el.dataset.bkSkin); }));
+  }
+
+  function setDisguise(skin) {
+    if (!skin || !HUD.SKINS[skin] || skin === settings.disguise) return;
+    settings.disguise = skin;
+    paintDisguise();
+    renderHud();
+    save(false);
+  }
+
+  async function loadStandings() {
+    if (standings) {
+      if (hudTab === "stats") renderHud();
+      return;
+    }
+    statsLoading = true;
+    statsError = null;
+    renderHud();
+    const res = await send(MSG.GET_STANDINGS);
+    statsLoading = false;
+    if (!res || !res.ok) statsError = (res && res.error) || "Could not load standings.";
+    else { standings = res.groups || []; statsError = null; }
+    renderHud();
+  }
+
+  async function onExcuse() {
+    const out = els.hudCard.querySelector(".bk-excuse-out");
+    if (out) {
+      out.hidden = false;
+      out.textContent = "Thinking\u2026";
+    }
+    const m = current();
+    const context = m
+      ? `${m.home.name} ${m.home.score}-${m.away.score} ${m.away.name}, ${m.minute || ""}'`
+      : "a tense moment";
+    const res = await send(MSG.GENERATE_EXCUSE, { context });
+    const ok = res && res.ok;
+    if (out) out.textContent = ok ? res.excuse : (res?.error || "Could not generate.");
+    if (!ok && !settings.groqApiKey) setActiveTab("settings");
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* "Live now" overview list                                         */
+  /* ---------------------------------------------------------------- */
   function statusBits(m) {
     const s = (m.status || "").toUpperCase();
     if (s === "LIVE") return { cls: "live", txt: m.minute != null ? `${m.minute}'` : "LIVE" };
@@ -117,6 +236,7 @@
     const res = await send(force ? MSG.REFRESH_MATCHES : MSG.GET_MATCHES);
     matches = (res && res.matches) || [];
     renderScores(res && res.meta);
+    renderHud();
   }
 
   function closePopup() {
@@ -155,9 +275,7 @@
   els.disguise.addEventListener("click", (e) => {
     const btn = e.target.closest(".seg-btn");
     if (!btn) return;
-    settings.disguise = btn.dataset.mode;
-    paintDisguise();
-    save();
+    setDisguise(btn.dataset.mode);
   });
 
   [["favoriteTeam", "favoriteTeam"], ["scoresEndpoint", "scoresEndpoint"], ["groqApiKey", "groqApiKey"]]
@@ -184,20 +302,11 @@
     loadScores(true);
   });
 
-  els.excuse.addEventListener("click", async () => {
-    els.excuseOut.hidden = false;
-    els.excuseOut.textContent = "Thinking\u2026";
-    const m = matches[0];
-    const context = m
-      ? `${m.home.name} ${m.home.score}-${m.away.score} ${m.away.name}, ${m.minute || ""}'`
-      : "a tense moment";
-    const res = await send(MSG.GENERATE_EXCUSE, { context });
-    els.excuseOut.textContent = res && res.ok ? res.excuse : (res?.error || "Could not generate.");
-    if (!res?.ok && !settings.groqApiKey) setActiveTab("settings");
-  });
-
   /* init */
   setActiveTab("dashboard");
   wirePopupShortcut();
-  load().then(() => loadScores(false));
+  load().then(() => {
+    renderHud();
+    loadScores(false);
+  });
 })();

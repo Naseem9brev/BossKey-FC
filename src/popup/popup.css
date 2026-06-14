@@ -217,3 +217,20 @@ button.ghost:hover { border-color: var(--accent); }
   color: #dfe3ea; background: rgba(255, 255, 255, 0.06);
   border-radius: 4px; padding: 0 4px; font-weight: 700; font-size: 9.5px;
 }
+
+/* Live HUD host — render the on-page overlay card inline inside the popup */
+.hud-host { margin-bottom: 10px; }
+.hud-host #bk-overlay {
+  position: static;
+  display: block;
+  width: 100%;
+  top: auto; right: auto; left: auto; bottom: auto;
+  z-index: auto;
+  animation: none;
+}
+/* In the popup there is no page to hover, so keep the disguise switcher visible */
+.hud-host #bk-overlay .bk-switch-float {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
