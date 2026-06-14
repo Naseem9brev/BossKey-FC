@@ -1,27 +1,23 @@
 /*
  * BossKey FC — content overlay.
  *
- * Draws a small draggable "score HUD" on top of any page. Designed to be
- * dismissed instantly with the panic key (Escape) and toggled with Alt+W.
- * Optional disguise skins make the widget read like an office tool.
+ * Draws a draggable "score HUD" on top of any page. The native skin is a
+ * polished football card (flags, live pulse, fixture carousel). Each disguise
+ * skin renders a *full* fake-app layout (Slack / Jira / Linear / Sheets) with
+ * the live score blended into that app's UI, so a passer-by sees an office tool.
+ * Panic key (Escape) hides it instantly; Alt+W toggles it.
  */
 (function () {
-  const { STORAGE, MSG, DEFAULT_SETTINGS } = window.BOSSKEY_CONFIG;
+  const { STORAGE, MSG, DEFAULT_SETTINGS, flagEmoji } = window.BOSSKEY_CONFIG;
 
   const POSITION_KEY = "bosskey_overlay_pos";
   let settings = { ...DEFAULT_SETTINGS };
   let matches = [];
   let activeIndex = 0;
   let root = null;
+  let card = null;
   let visible = false;
   let pollTimer = null;
-
-  const DISGUISE = {
-    off: { title: "BossKey FC", glyph: "\u26BD", className: "bk-skin-off" },
-    sheets: { title: "Sheet1 \u2014 Budget", glyph: "\u2630", className: "bk-skin-sheets" },
-    slack: { title: "# team-standup", glyph: "\u0040", className: "bk-skin-slack" },
-    jira: { title: "BOSS-2026 \u2014 Board", glyph: "\u25A4", className: "bk-skin-jira" }
-  };
 
   /* ---------------------------------------------------------------- */
   /* Messaging helpers                                                */
@@ -51,80 +47,261 @@
   }
 
   /* ---------------------------------------------------------------- */
+  /* Formatting helpers                                               */
+  /* ---------------------------------------------------------------- */
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"]/g, (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  }
+
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+  function fmtKick(localDate) {
+    const m = /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/.exec(localDate || "");
+    if (!m) return "";
+    const [, mm, dd, , hh, mi] = m;
+    return `${+dd} ${MONTHS[+mm - 1]} · ${hh}:${mi}`;
+  }
+
+  function flag(code) {
+    return flagEmoji ? flagEmoji(code) : "\u26BD";
+  }
+
+  function statusText(mt) {
+    const s = (mt.status || "").toUpperCase();
+    if (s === "LIVE") return mt.minute != null ? `${mt.minute}'` : "LIVE";
+    if (s === "HT") return "HT";
+    if (s === "FT") return "FT";
+    return "SCHEDULED";
+  }
+
+  // App-specific status mappings.
+  const JIRA_STATUS = {
+    LIVE: { label: "IN PROGRESS", cls: "prog" },
+    HT: { label: "IN REVIEW", cls: "review" },
+    FT: { label: "DONE", cls: "done" },
+    SCHEDULED: { label: "TO DO", cls: "todo" }
+  };
+  const LINEAR_STATUS = {
+    LIVE: { label: "In Progress", cls: "started" },
+    HT: { label: "In Review", cls: "review" },
+    FT: { label: "Done", cls: "done" },
+    SCHEDULED: { label: "Todo", cls: "todo" }
+  };
+
+  function jiraStatus(mt) { return JIRA_STATUS[(mt.status || "SCHEDULED").toUpperCase()] || JIRA_STATUS.SCHEDULED; }
+  function linearStatus(mt) { return LINEAR_STATUS[(mt.status || "SCHEDULED").toUpperCase()] || LINEAR_STATUS.SCHEDULED; }
+
+  function current() {
+    return matches[activeIndex] || null;
+  }
+
+  function dots() {
+    return matches
+      .map((_, i) => `<i class="bk-dot${i === activeIndex ? " on" : ""}"></i>`)
+      .join("");
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Skin templates                                                   */
+  /* ---------------------------------------------------------------- */
+  function emptyBody(label) {
+    return `<div class="bk-empty">${esc(label)}</div>`;
+  }
+
+  function skinOff(mt) {
+    if (!mt) return shellOff(emptyBody("No matches · ↻"));
+    const live = (mt.status || "").toUpperCase() === "LIVE";
+    const st = statusText(mt);
+    const stCls = (mt.status || "").toLowerCase();
+    const body = `
+      <div class="bk-stage">
+        <div class="bk-side">
+          <span class="bk-flag">${flag(mt.home.code)}</span>
+          <span class="bk-code">${esc(mt.home.code || mt.home.name)}</span>
+        </div>
+        <div class="bk-center">
+          <div class="bk-score"><b>${esc(mt.home.score)}</b><i>:</i><b>${esc(mt.away.score)}</b></div>
+          <div class="bk-status bk-status-${stCls}">${live ? '<span class="bk-pulse"></span>' : ""}${esc(st)}</div>
+        </div>
+        <div class="bk-side">
+          <span class="bk-flag">${flag(mt.away.code)}</span>
+          <span class="bk-code">${esc(mt.away.code || mt.away.name)}</span>
+        </div>
+      </div>
+      <div class="bk-subrow">
+        <span class="bk-group">${esc(mt.group || "")}</span>
+        <span class="bk-kick">${esc(fmtKick(mt.kickoff))}</span>
+      </div>
+      <div class="bk-nav">
+        <button class="bk-nav-btn" data-bk-prev>\u2039</button>
+        <span class="bk-dots">${dots()}</span>
+        <button class="bk-nav-btn" data-bk-next>\u203A</button>
+      </div>`;
+    return shellOff(body);
+  }
+
+  function shellOff(body) {
+    return `
+      <div class="bk-pitch"></div>
+      <header class="bk-head" data-bk-drag>
+        <span class="bk-comp"><span class="bk-trophy">\u{1F3C6}</span> World Cup 2026</span>
+        <div class="bk-head-actions">
+          <button class="bk-icon-btn" data-bk-refresh title="Refresh">\u21BB</button>
+          <button class="bk-icon-btn bk-panic" data-bk-panic title="Hide (Esc)">\u2715</button>
+        </div>
+      </header>
+      <div class="bk-body">${body}</div>
+      <footer class="bk-foot">
+        <button class="bk-excuse-btn" data-bk-excuse>\u{1F4AC} Boss-safe excuse</button>
+        <div class="bk-excuse-out" hidden></div>
+      </footer>`;
+  }
+
+  function scoreLine(mt) {
+    return `${flag(mt.home.code)} ${esc(mt.home.name)} <b>${esc(mt.home.score)}\u2013${esc(mt.away.score)}</b> ${esc(mt.away.name)} ${flag(mt.away.code)}`;
+  }
+
+  function skinSlack(mt) {
+    const live = (mt && (mt.status || "").toUpperCase() === "LIVE");
+    const status = mt ? statusText(mt) : "";
+    return `
+      <header class="sk-slk-head" data-bk-drag>
+        <span class="sk-slk-ch"><span class="sk-hash">#</span> world-cup</span>
+        <button class="sk-x" data-bk-panic title="Hide (Esc)">\u2715</button>
+      </header>
+      <div class="sk-slk-list" data-bk-next title="Next match">
+        <div class="sk-avatar">\u26BD</div>
+        <div class="sk-msg">
+          <div class="sk-msg-top"><b>matchday</b><span class="sk-app">APP</span><span class="sk-time">2:14 PM</span></div>
+          <div class="sk-msg-text">${mt ? scoreLine(mt) : "No fixtures right now"}${mt ? ` <span class="sk-live ${live ? "on" : ""}">${esc(status)}</span>` : ""}</div>
+          <div class="sk-reacts"><span class="sk-react">\u{1F525} 4</span><span class="sk-react">\u26BD 7</span><span class="sk-react sk-addr">\u{1F642}\u002B</span></div>
+        </div>
+      </div>
+      <div class="sk-slk-compose">
+        <span class="sk-plus">\u002B</span>
+        <span class="sk-input">Message #world-cup</span>
+        <span class="sk-send" data-bk-excuse title="Boss-safe excuse">\u27A4</span>
+      </div>
+      <div class="bk-excuse-out sk-slk-note" hidden></div>`;
+  }
+
+  function skinJira(mt) {
+    const js = mt ? jiraStatus(mt) : JIRA_STATUS.SCHEDULED;
+    const summary = mt
+      ? `${flag(mt.home.code)} ${esc(mt.home.code)} ${esc(mt.home.score)}\u2013${esc(mt.away.score)} ${esc(mt.away.code)} ${flag(mt.away.code)} \u00b7 ${esc(statusText(mt))}`
+      : "Awaiting fixtures";
+    const grp = mt && mt.group ? esc(mt.group) : "Backlog";
+    return `
+      <header class="sk-jira-head" data-bk-drag>
+        <span class="sk-jira-proj"><span class="sk-jira-mark">\u25A3</span> BOSS board</span>
+        <button class="sk-x" data-bk-panic title="Hide (Esc)">\u2715</button>
+      </header>
+      <div class="sk-jira-rows">
+        <div class="sk-jira-row" data-bk-next title="Next match">
+          <span class="sk-jtype sk-story">\u2714</span>
+          <span class="sk-jkey">BOSS-2026</span>
+          <span class="sk-jsum">${summary}</span>
+          <span class="sk-loz sk-${js.cls}">${js.label}</span>
+          <span class="sk-jav">M</span>
+        </div>
+        <div class="sk-jira-row sk-dim">
+          <span class="sk-jtype sk-task">\u25A4</span>
+          <span class="sk-jkey">BOSS-2027</span>
+          <span class="sk-jsum">${grp} standings review</span>
+          <span class="sk-loz sk-todo">TO DO</span>
+          <span class="sk-jav sk-jav2">A</span>
+        </div>
+      </div>`;
+  }
+
+  function skinLinear(mt) {
+    const ls = mt ? linearStatus(mt) : LINEAR_STATUS.SCHEDULED;
+    const name = mt
+      ? `${flag(mt.home.code)} ${esc(mt.home.code)} ${esc(mt.home.score)}\u2013${esc(mt.away.score)} ${esc(mt.away.code)} ${flag(mt.away.code)} \u00b7 ${esc(statusText(mt))}`
+      : "Awaiting fixtures";
+    return `
+      <header class="sk-lin-head" data-bk-drag>
+        <span class="sk-lin-title"><span class="sk-lin-mark">\u25C9</span> Active Issues</span>
+        <button class="sk-x" data-bk-panic title="Hide (Esc)">\u2715</button>
+      </header>
+      <div class="sk-lin-rows">
+        <div class="sk-lin-row" data-bk-next title="Next match">
+          <span class="sk-lprio"><i></i><i></i><i></i></span>
+          <span class="sk-ldot sk-${ls.cls}"></span>
+          <span class="sk-lid">FC-26</span>
+          <span class="sk-lname">${name}</span>
+          <span class="sk-lstat">${ls.label}</span>
+          <span class="sk-lav">M</span>
+        </div>
+        <div class="sk-lin-row sk-dim">
+          <span class="sk-lprio sk-lprio2"><i></i><i></i><i></i></span>
+          <span class="sk-ldot sk-todo"></span>
+          <span class="sk-lid">FC-27</span>
+          <span class="sk-lname">Review group stage table</span>
+          <span class="sk-lstat">Todo</span>
+          <span class="sk-lav sk-lav2">A</span>
+        </div>
+      </div>`;
+  }
+
+  function skinSheets(mt) {
+    const h = mt ? mt.home : { code: "", score: "" };
+    const a = mt ? mt.away : { code: "", score: "" };
+    const s = mt ? (mt.status || "").toUpperCase() : "";
+    const min = !mt ? ""
+      : s === "LIVE" ? (mt.minute != null ? `${mt.minute}'` : "LIVE")
+      : s === "HT" ? "HT"
+      : s === "FT" ? "FT"
+      : "\u2014";
+    const grp = mt && mt.group ? esc(mt.group.replace(/^Group\s*/i, "")) : "";
+    return `
+      <header class="sk-sh-head" data-bk-drag>
+        <span class="sk-sh-doc"><span class="sk-sh-mark">\u2637</span> Q3 Forecast</span>
+        <button class="sk-x" data-bk-panic title="Hide (Esc)">\u2715</button>
+      </header>
+      <div class="sk-sh-toolbar"><span>\u21A9</span><span>\u21AA</span><span class="sk-sh-sep"></span><span>B</span><span><i>I</i></span><span>\u2630</span></div>
+      <div class="sk-grid">
+        <div class="sk-corner"></div>
+        <div class="sk-colh">A</div><div class="sk-colh">B</div><div class="sk-colh">C</div>
+        <div class="sk-rowh">1</div>
+        <div class="sk-cell sk-th">Team</div><div class="sk-cell sk-th">Pts</div><div class="sk-cell sk-th">Min</div>
+        <div class="sk-rowh">2</div>
+        <div class="sk-cell sk-link" data-bk-next title="Next match">${esc(h.code)}</div><div class="sk-cell sk-num">${esc(h.score)}</div><div class="sk-cell sk-min">${esc(min)}</div>
+        <div class="sk-rowh">3</div>
+        <div class="sk-cell">${esc(a.code)}</div><div class="sk-cell sk-num">${esc(a.score)}</div><div class="sk-cell sk-grp">${grp}</div>
+      </div>`;
+  }
+
+  const SKINS = {
+    off: skinOff,
+    slack: skinSlack,
+    jira: skinJira,
+    linear: skinLinear,
+    sheets: skinSheets
+  };
+
+  /* ---------------------------------------------------------------- */
   /* Rendering                                                        */
   /* ---------------------------------------------------------------- */
   function buildShell() {
     root = document.createElement("div");
     root.id = "bk-overlay";
     root.setAttribute("role", "complementary");
-    root.innerHTML = `
-      <div class="bk-card">
-        <header class="bk-head" data-bk-drag>
-          <span class="bk-glyph"></span>
-          <span class="bk-title"></span>
-          <div class="bk-head-actions">
-            <button class="bk-icon-btn" data-bk-refresh title="Refresh">\u21BB</button>
-            <button class="bk-icon-btn bk-panic" data-bk-panic title="Panic (Esc)">\u2715</button>
-          </div>
-        </header>
-        <div class="bk-body">
-          <div class="bk-score"></div>
-          <div class="bk-meta"></div>
-          <div class="bk-nav">
-            <button class="bk-nav-btn" data-bk-prev>\u2039</button>
-            <span class="bk-dots"></span>
-            <button class="bk-nav-btn" data-bk-next>\u203A</button>
-          </div>
-        </div>
-        <footer class="bk-foot">
-          <button class="bk-excuse-btn" data-bk-excuse>Boss-safe excuse</button>
-          <div class="bk-excuse-out" hidden></div>
-        </footer>
-      </div>`;
+    card = document.createElement("div");
+    card.className = "bk-card";
+    root.appendChild(card);
     document.documentElement.appendChild(root);
-    wireEvents();
     restorePosition();
   }
 
-  function renderMatch() {
-    if (!root) return;
-    const skin = DISGUISE[settings.disguise] || DISGUISE.off;
-    root.className = skin.className;
-    root.querySelector(".bk-glyph").textContent = skin.glyph;
-    root.querySelector(".bk-title").textContent = skin.title;
-
-    const dots = root.querySelector(".bk-dots");
-    dots.innerHTML = matches
-      .map((_, i) => `<i class="bk-dot${i === activeIndex ? " on" : ""}"></i>`)
-      .join("");
-
-    const scoreEl = root.querySelector(".bk-score");
-    const metaEl = root.querySelector(".bk-meta");
-
-    if (!matches.length) {
-      scoreEl.textContent = "No matches";
-      metaEl.textContent = "Try refresh \u21BB";
-      return;
-    }
-
-    const m = matches[activeIndex];
-    scoreEl.innerHTML = `
-      <span class="bk-team">${esc(m.home.code || m.home.name)}</span>
-      <span class="bk-num">${m.home.score}</span>
-      <span class="bk-sep">:</span>
-      <span class="bk-num">${m.away.score}</span>
-      <span class="bk-team">${esc(m.away.code || m.away.name)}</span>`;
-
-    const minute = m.minute != null ? `${m.minute}'` : "";
-    metaEl.innerHTML = `
-      <span class="bk-status bk-status-${(m.status || "").toLowerCase()}">${esc(m.status)}</span>
-      <span class="bk-minute">${minute}</span>
-      <span class="bk-group">${esc(m.group || "")}</span>`;
-  }
-
-  function esc(s) {
-    return String(s == null ? "" : s).replace(/[&<>"]/g, (c) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  function render() {
+    if (!root) buildShell();
+    const skin = SKINS[settings.disguise] ? settings.disguise : "off";
+    root.className = `bk-skin-${skin}`;
+    card.innerHTML = (SKINS[skin] || skinOff)(current());
+    wireEvents();
   }
 
   /* ---------------------------------------------------------------- */
@@ -134,7 +311,7 @@
     if (!root) buildShell();
     visible = true;
     root.style.display = "block";
-    renderMatch();
+    render();
     startPolling();
   }
 
@@ -157,7 +334,7 @@
     const ms = Math.max(30, (settings.pollMinutes || 1) * 60) * 1000;
     pollTimer = setInterval(async () => {
       await loadMatches();
-      renderMatch();
+      if (visible) render();
     }, ms);
   }
 
@@ -182,9 +359,10 @@
   }
 
   function enableDrag(handle) {
+    if (!handle) return;
     let startX, startY, originLeft, originTop, dragging = false;
     handle.addEventListener("pointerdown", (e) => {
-      if (e.target.closest(".bk-icon-btn")) return;
+      if (e.target.closest("[data-bk-panic],[data-bk-refresh]")) return;
       dragging = true;
       handle.setPointerCapture(e.pointerId);
       const rect = root.getBoundingClientRect();
@@ -217,37 +395,51 @@
   /* Events                                                           */
   /* ---------------------------------------------------------------- */
   function wireEvents() {
-    enableDrag(root.querySelector("[data-bk-drag]"));
+    enableDrag(card.querySelector("[data-bk-drag]"));
 
-    root.querySelector("[data-bk-panic]").addEventListener("click", panic);
-    root.querySelector("[data-bk-refresh]").addEventListener("click", async () => {
+    card.querySelectorAll("[data-bk-panic]").forEach((el) =>
+      el.addEventListener("click", (e) => { e.stopPropagation(); panic(); }));
+
+    const refresh = card.querySelector("[data-bk-refresh]");
+    if (refresh) refresh.addEventListener("click", async (e) => {
+      e.stopPropagation();
       const res = await send(MSG.REFRESH_MATCHES);
       matches = (res && res.matches) || matches;
-      renderMatch();
+      if (activeIndex >= matches.length) activeIndex = 0;
+      render();
     });
-    root.querySelector("[data-bk-prev]").addEventListener("click", () => {
-      if (!matches.length) return;
-      activeIndex = (activeIndex - 1 + matches.length) % matches.length;
-      renderMatch();
-    });
-    root.querySelector("[data-bk-next]").addEventListener("click", () => {
-      if (!matches.length) return;
-      activeIndex = (activeIndex + 1) % matches.length;
-      renderMatch();
-    });
-    root.querySelector("[data-bk-excuse]").addEventListener("click", onExcuse);
+
+    card.querySelectorAll("[data-bk-next]").forEach((el) =>
+      el.addEventListener("click", () => {
+        if (!matches.length) return;
+        activeIndex = (activeIndex + 1) % matches.length;
+        render();
+      }));
+
+    card.querySelectorAll("[data-bk-prev]").forEach((el) =>
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (!matches.length) return;
+        activeIndex = (activeIndex - 1 + matches.length) % matches.length;
+        render();
+      }));
+
+    const excuse = card.querySelector("[data-bk-excuse]");
+    if (excuse) excuse.addEventListener("click", (e) => { e.stopPropagation(); onExcuse(); });
   }
 
   async function onExcuse() {
-    const out = root.querySelector(".bk-excuse-out");
-    out.hidden = false;
-    out.textContent = "Thinking\u2026";
-    const m = matches[activeIndex];
+    const out = card.querySelector(".bk-excuse-out");
+    if (out) {
+      out.hidden = false;
+      out.textContent = "Thinking\u2026";
+    }
+    const m = current();
     const context = m
       ? `${m.home.name} ${m.home.score}-${m.away.score} ${m.away.name}, ${m.minute || ""}'`
       : "a tense moment";
     const res = await send(MSG.GENERATE_EXCUSE, { context });
-    out.textContent = res && res.ok ? res.excuse : (res?.error || "Could not generate.");
+    if (out) out.textContent = res && res.ok ? res.excuse : (res?.error || "Could not generate.");
   }
 
   // Panic key — Escape hides the overlay instantly.
@@ -273,7 +465,7 @@
         settings.enabled ? show() : hide();
         return;
       }
-      if (visible) renderMatch();
+      if (visible) render();
     }
   });
 

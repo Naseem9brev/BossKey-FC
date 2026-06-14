@@ -34,7 +34,7 @@
     GROQ_MODEL: "llama-3.1-8b-instant",
 
     // Disguise skins shown by the overlay header.
-    DISGUISE_MODES: ["sheets", "slack", "jira", "off"],
+    DISGUISE_MODES: ["off", "slack", "jira", "linear", "sheets"],
 
     // Default user settings.
     DEFAULT_SETTINGS: {
@@ -83,6 +83,55 @@
       group: "Group D"
     }
   ];
+
+  // FIFA 3-letter code -> ISO 3166-1 alpha-2, used to render flag emoji.
+  const FIFA_TO_ISO2 = {
+    AFG: "AF", ALB: "AL", ALG: "DZ", AND: "AD", ANG: "AO", ARG: "AR", ARM: "AM",
+    AUS: "AU", AUT: "AT", AZE: "AZ", BAH: "BS", BAN: "BD", BDI: "BI", BEL: "BE",
+    BEN: "BJ", BER: "BM", BFA: "BF", BHR: "BH", BIH: "BA", BLR: "BY", BLZ: "BZ",
+    BOL: "BO", BOT: "BW", BRA: "BR", BRU: "BN", BUL: "BG", CAN: "CA", CGO: "CG",
+    CHA: "TD", CHI: "CL", CHN: "CN", CIV: "CI", CMR: "CM", COD: "CD", COL: "CO",
+    COM: "KM", CPV: "CV", CRC: "CR", CRO: "HR", CTA: "CF", CUB: "CU", CUW: "CW",
+    CYP: "CY", CZE: "CZ", DEN: "DK", DOM: "DO", ECU: "EC", EGY: "EG", ENG: "_ENG",
+    EQG: "GQ", ERI: "ER", ESP: "ES", EST: "EE", ETH: "ET", FIJ: "FJ", FIN: "FI",
+    FRA: "FR", FRO: "FO", GAB: "GA", GAM: "GM", GEO: "GE", GER: "DE", GHA: "GH",
+    GNB: "GW", GRE: "GR", GUA: "GT", GUI: "GN", GUM: "GU", GUY: "GY", HAI: "HT",
+    HKG: "HK", HON: "HN", HUN: "HU", IDN: "ID", INA: "ID", IND: "IN", IRL: "IE",
+    IRN: "IR", IRQ: "IQ", ISL: "IS", ISR: "IL", ITA: "IT", JAM: "JM", JOR: "JO",
+    JPN: "JP", KAZ: "KZ", KEN: "KE", KGZ: "KG", KOR: "KR", KSA: "SA", KUW: "KW",
+    LAO: "LA", LBN: "LB", LBR: "LR", LBY: "LY", LCA: "LC", LES: "LS", LTU: "LT",
+    LUX: "LU", LVA: "LV", MAD: "MG", MAR: "MA", MAS: "MY", MDA: "MD", MEX: "MX",
+    MKD: "MK", MLI: "ML", MLT: "MT", MNE: "ME", MOZ: "MZ", MRI: "MU", MTN: "MR",
+    MWI: "MW", MYA: "MM", NAM: "NA", NCA: "NI", NCL: "NC", NED: "NL", NEP: "NP",
+    NGA: "NG", NIG: "NE", NIR: "_NIR", NOR: "NO", NZL: "NZ", OMA: "OM", PAK: "PK",
+    PAN: "PA", PAR: "PY", PER: "PE", PHI: "PH", PLE: "PS", PNG: "PG", POL: "PL",
+    POR: "PT", PRK: "KP", QAT: "QA", ROU: "RO", RSA: "ZA", RUS: "RU", RWA: "RW",
+    SCO: "_SCO", SEN: "SN", SGP: "SG", SLE: "SL", SLV: "SV", SMR: "SM", SOL: "SB",
+    SOM: "SO", SRB: "RS", SRI: "LK", SSD: "SS", STP: "ST", SUD: "SD", SUI: "CH",
+    SUR: "SR", SVK: "SK", SVN: "SI", SWE: "SE", SWZ: "SZ", SYR: "SY", TAH: "PF",
+    TAN: "TZ", TGA: "TO", THA: "TH", TJK: "TJ", TKM: "TM", TLS: "TL", TOG: "TG",
+    TPE: "TW", TRI: "TT", TUN: "TN", TUR: "TR", UAE: "AE", UGA: "UG", UKR: "UA",
+    URU: "UY", USA: "US", UZB: "UZ", VAN: "VU", VEN: "VE", VIE: "VN", WAL: "_WAL",
+    YEM: "YE", ZAM: "ZM", ZIM: "ZW"
+  };
+
+  // Subdivision flags that aren't simple ISO-2 regional-indicator pairs.
+  const SPECIAL_FLAGS = {
+    _ENG: "\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}",
+    _SCO: "\u{1F3F4}\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}\u{E007F}",
+    _WAL: "\u{1F3F4}\u{E0067}\u{E0062}\u{E0077}\u{E006C}\u{E0073}\u{E007F}",
+    _NIR: "\u{1F1EC}\u{1F1E7}"
+  };
+
+  function flagEmoji(fifaCode) {
+    const iso = FIFA_TO_ISO2[String(fifaCode || "").toUpperCase()];
+    if (!iso) return "\u26BD";
+    if (SPECIAL_FLAGS[iso]) return SPECIAL_FLAGS[iso];
+    return iso.replace(/[A-Z]/g, (c) =>
+      String.fromCodePoint(127397 + c.charCodeAt(0)));
+  }
+
+  CONFIG.flagEmoji = flagEmoji;
 
   root.BOSSKEY_CONFIG = CONFIG;
   root.BOSSKEY_SAMPLE_MATCHES = SAMPLE_MATCHES;
