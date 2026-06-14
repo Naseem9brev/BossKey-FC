@@ -267,7 +267,12 @@
   // React to settings changes from the popup.
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "sync" && changes[STORAGE.SETTINGS]) {
+      const wasEnabled = settings.enabled;
       settings = { ...DEFAULT_SETTINGS, ...changes[STORAGE.SETTINGS].newValue };
+      if (wasEnabled !== settings.enabled) {
+        settings.enabled ? show() : hide();
+        return;
+      }
       if (visible) renderMatch();
     }
   });
